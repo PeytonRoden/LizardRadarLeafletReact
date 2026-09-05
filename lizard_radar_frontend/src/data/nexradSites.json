@@ -1,0 +1,966 @@
+{
+    "nexrad_sites": [
+      {
+        "city": "Aberdeen",
+        "icao": "KABR",
+        "latitude": 45.4558,
+        "longitude": -98.4131
+      },
+      {
+        "city": "Albany",
+        "icao": "KENX",
+        "latitude": 42.5864,
+        "longitude": -74.0639
+      },
+      {
+        "city": "Albuquerque",
+        "icao": "KABX",
+        "latitude": 35.1497,
+        "longitude": -106.8239
+      },
+      {
+        "city": "Altus AFB",
+        "icao": "KFDR",
+        "latitude": 34.3622,
+        "longitude": -98.9764
+      },
+      {
+        "city": "Amarillo",
+        "icao": "KAMA",
+        "latitude": 35.2333,
+        "longitude": -101.7092
+      },
+      {
+        "city": "Anchorage",
+        "icao": "PAHG",
+        "latitude": 60.7258,
+        "longitude": -151.3514
+      },
+      {
+        "city": "Anderson AFB",
+        "icao": "PGUA",
+        "latitude": 13.4525,
+        "longitude": 144.8114
+      },
+      {
+        "city": "Atlanta",
+        "icao": "KFFC",
+        "latitude": 33.3636,
+        "longitude": -84.5658
+      },
+      {
+        "city": "Austin/San Antonio",
+        "icao": "KEWX",
+        "latitude": 29.7039,
+        "longitude": -98.0286
+      },
+      {
+        "city": "Beale AFB",
+        "icao": "KBBX",
+        "latitude": 39.4961,
+        "longitude": -121.6317
+      },
+      {
+        "city": "Bethel",
+        "icao": "PABC",
+        "latitude": 60.7919,
+        "longitude": -161.8764
+      },
+      {
+        "city": "Billings",
+        "icao": "KBLX",
+        "latitude": 45.8539,
+        "longitude": -108.6067
+      },
+      {
+        "city": "Binghamton",
+        "icao": "KBGM",
+        "latitude": 42.1997,
+        "longitude": -75.9847
+      },
+      {
+        "city": "Birmingham",
+        "icao": "KBMX",
+        "latitude": 33.1722,
+        "longitude": -86.7697
+      },
+      {
+        "city": "Bismarck",
+        "icao": "KBIS",
+        "latitude": 46.7708,
+        "longitude": -100.7606
+      },
+      {
+        "city": "Boise",
+        "icao": "KCBX",
+        "latitude": 43.4906,
+        "longitude": -116.2356
+      },
+      {
+        "city": "Boston",
+        "icao": "KBOX",
+        "latitude": 41.9558,
+        "longitude": -71.1369
+      },
+      {
+        "city": "Brownsville",
+        "icao": "KBRO",
+        "latitude": 25.9161,
+        "longitude": -97.4189
+      },
+      {
+        "city": "Buffalo",
+        "icao": "KBUF",
+        "latitude": 42.9489,
+        "longitude": -78.7367
+      },
+      {
+        "city": "Burlington",
+        "icao": "KCXX",
+        "latitude": 44.5111,
+        "longitude": -73.1669
+      },
+      {
+        "city": "Camp Humphreys",
+        "icao": "RKSG",
+        "latitude": 36.9558,
+        "longitude": 127.0178
+      },
+      {
+        "city": "Cannon AFB",
+        "icao": "KFDX",
+        "latitude": 34.6353,
+        "longitude": -103.6297
+      },
+      {
+        "city": "Cedar City",
+        "icao": "KICX",
+        "latitude": 37.5908,
+        "longitude": -112.8622
+      },
+      {
+        "city": "Charleston, SC",
+        "icao": "KCLX",
+        "latitude": 32.6556,
+        "longitude": -81.0422
+      },
+      {
+        "city": "Charleston, WV",
+        "icao": "KRLX",
+        "latitude": 38.3111,
+        "longitude": -81.7231
+      },
+      {
+        "city": "Cheyenne",
+        "icao": "KCYS",
+        "latitude": 41.1519,
+        "longitude": -104.8061
+      },
+      {
+        "city": "Chicago",
+        "icao": "KLOT",
+        "latitude": 41.6047,
+        "longitude": -88.0847
+      },
+      {
+        "city": "Cincinnati",
+        "icao": "KILN",
+        "latitude": 39.4203,
+        "longitude": -83.8217
+      },
+      {
+        "city": "Cleveland",
+        "icao": "KCLE",
+        "latitude": 41.4131,
+        "longitude": -81.8597
+      },
+      {
+        "city": "Columbia",
+        "icao": "KCAE",
+        "latitude": 33.9486,
+        "longitude": -81.1183
+      },
+      {
+        "city": "Columbus AFB",
+        "icao": "KGWX",
+        "latitude": 33.8967,
+        "longitude": -88.3289
+      },
+      {
+        "city": "Corpus Christi",
+        "icao": "KCRP",
+        "latitude": 27.7842,
+        "longitude": -97.5111
+      },
+      {
+        "city": "Dallas/Ft. Worth",
+        "icao": "KFWS",
+        "latitude": 32.5731,
+        "longitude": -97.3031
+      },
+      {
+        "city": "Davenport",
+        "icao": "KDVN",
+        "latitude": 41.6117,
+        "longitude": -90.5808
+      },
+      {
+        "city": "Denver",
+        "icao": "KFTG",
+        "latitude": 39.7867,
+        "longitude": -104.5458
+      },
+      {
+        "city": "Des Moines",
+        "icao": "KDMX",
+        "latitude": 41.7311,
+        "longitude": -93.7228
+      },
+      {
+        "city": "Detroit",
+        "icao": "KDTX",
+        "latitude": 42.6997,
+        "longitude": -83.4717
+      },
+      {
+        "city": "Dodge City",
+        "icao": "KDDC",
+        "latitude": 37.7608,
+        "longitude": -99.9689
+      },
+      {
+        "city": "Dover AFB",
+        "icao": "KDOX",
+        "latitude": 38.8256,
+        "longitude": -75.4397
+      },
+      {
+        "city": "Duluth",
+        "icao": "KDLH",
+        "latitude": 46.8369,
+        "longitude": -92.2097
+      },
+      {
+        "city": "Dyess AFB",
+        "icao": "KDYX",
+        "latitude": 32.5383,
+        "longitude": -99.2544
+      },
+      {
+        "city": "Edwards AFB",
+        "icao": "KEYX",
+        "latitude": 35.0978,
+        "longitude": -117.5608
+      },
+      {
+        "city": "Eglin AFB",
+        "icao": "KEVX",
+        "latitude": 30.5644,
+        "longitude": -85.9214
+      },
+      {
+        "city": "El Paso",
+        "icao": "KEPZ",
+        "latitude": 31.8731,
+        "longitude": -106.6981
+      },
+      {
+        "city": "Elko",
+        "icao": "KLRX",
+        "latitude": 40.7397,
+        "longitude": -116.8028
+      },
+      {
+        "city": "Eureka",
+        "icao": "KBHX",
+        "latitude": 40.4983,
+        "longitude": -124.2919
+      },
+      {
+        "city": "Fairbanks",
+        "icao": "PAPD",
+        "latitude": 65.0350,
+        "longitude": -147.5017
+      },
+      {
+        "city": "Flagstaff",
+        "icao": "KFSX",
+        "latitude": 34.5744,
+        "longitude": -111.1978
+      },
+      {
+        "city": "Fort Campbell",
+        "icao": "KHPX",
+        "latitude": 36.7367,
+        "longitude": -87.2850
+      },
+      {
+        "city": "Fort Hood",
+        "icao": "KGRK",
+        "latitude": 30.7219,
+        "longitude": -97.3831
+      },
+      {
+        "city": "Fort Polk",
+        "icao": "KPOE",
+        "latitude": 31.1556,
+        "longitude": -92.9758
+      },
+      {
+        "city": "Fort Rucker",
+        "icao": "KEOX",
+        "latitude": 31.4606,
+        "longitude": -85.4594
+      },
+      {
+        "city": "Fort Smith",
+        "icao": "KSRX",
+        "latitude": 35.2906,
+        "longitude": -94.3617
+      },
+      {
+        "city": "Fort Wayne",
+        "icao": "KIWX",
+        "latitude": 41.3589,
+        "longitude": -85.7000
+      },
+      {
+        "city": "Gaylord",
+        "icao": "KAPX",
+        "latitude": 44.9072,
+        "longitude": -84.7197
+      },
+      {
+        "city": "Glasgow",
+        "icao": "KGGW",
+        "latitude": 48.2064,
+        "longitude": -106.6250
+      },
+      {
+        "city": "Goodland",
+        "icao": "KGLD",
+        "latitude": 39.3669,
+        "longitude": -101.7003
+      },
+      {
+        "city": "Grand Forks",
+        "icao": "KMVX",
+        "latitude": 47.5278,
+        "longitude": -97.3256
+      },
+      {
+        "city": "Grand Junction",
+        "icao": "KGJX",
+        "latitude": 39.0622,
+        "longitude": -108.2139
+      },
+      {
+        "city": "Grand Rapids",
+        "icao": "KGRR",
+        "latitude": 42.8939,
+        "longitude": -85.5447
+      },
+      {
+        "city": "Great Falls",
+        "icao": "KTFX",
+        "latitude": 47.4597,
+        "longitude": -111.3853
+      },
+      {
+        "city": "Green Bay",
+        "icao": "KGRB",
+        "latitude": 44.4983,
+        "longitude": -88.1114
+      },
+      {
+        "city": "Greer",
+        "icao": "KGSP",
+        "latitude": 34.8833,
+        "longitude": -82.2200
+      },
+      {
+        "city": "Griffiss AFB",
+        "icao": "KRMX",
+        "latitude": 43.4678,
+        "longitude": -75.4578
+      },
+      {
+        "city": "Hastings",
+        "icao": "KUEX",
+        "latitude": 40.3208,
+        "longitude": -98.4419
+      },
+      {
+        "city": "Holloman AFB",
+        "icao": "KHDX",
+        "latitude": 33.0764,
+        "longitude": -106.1228
+      },
+      {
+        "city": "Houlton",
+        "icao": "KCBW",
+        "latitude": 46.0392,
+        "longitude": -67.8064
+      },
+      {
+        "city": "Houston/Galveston",
+        "icao": "KHGX",
+        "latitude": 29.4719,
+        "longitude": -95.0789
+      },
+      {
+        "city": "Huntsville",
+        "icao": "KHTX",
+        "latitude": 34.9306,
+        "longitude": -86.0833
+      },
+      {
+        "city": "Indianapolis",
+        "icao": "KIND",
+        "latitude": 39.7075,
+        "longitude": -86.2803
+      },
+      {
+        "city": "Jackson, KY",
+        "icao": "KJKL",
+        "latitude": 37.5908,
+        "longitude": -83.3131
+      },
+      {
+        "city": "Jackson, MS",
+        "icao": "KDGX",
+        "latitude": 32.27994,
+        "longitude": -89.98444
+      },
+      {
+        "city": "Jacksonville",
+        "icao": "KJAX",
+        "latitude": 30.4847,
+        "longitude": -81.7019
+      },
+      {
+        "city": "Kadena, Okinawa",
+        "icao": "RODN",
+        "latitude": 26.3019,
+        "longitude": 127.9097
+      },
+      {
+        "city": "Kamuela",
+        "icao": "PHKN",
+        "latitude": 20.1256,
+        "longitude": -155.7778
+      },
+      {
+        "city": "Kansas City",
+        "icao": "KEAX",
+        "latitude": 38.8103,
+        "longitude": -94.2644
+      },
+      {
+        "city": "Key West",
+        "icao": "KBYX",
+        "latitude": 24.5975,
+        "longitude": -81.7031
+      },
+      {
+        "city": "King Salmon",
+        "icao": "PAKC",
+        "latitude": 58.6794,
+        "longitude": -156.6294
+      },
+      {
+        "city": "Knoxville/Tri-Cities",
+        "icao": "KMRX",
+        "latitude": 36.1686,
+        "longitude": -83.4017
+      },
+      {
+        "city": "Kunsan AB",
+        "icao": "RKJK",
+        "latitude": 35.9242,
+        "longitude": 126.6222
+      },
+      {
+        "city": "La Crosse",
+        "icao": "KARX",
+        "latitude": 43.8228,
+        "longitude": -91.1911
+      },
+      {
+        "city": "Lajes AB",
+        "icao": "LPLA",
+        "latitude": 38.7303,
+        "longitude": -27.3217
+      },
+      {
+        "city": "Lake Charles",
+        "icao": "KLCH",
+        "latitude": 30.1253,
+        "longitude": -93.2158
+      },
+      {
+        "city": "Las Vegas",
+        "icao": "KESX",
+        "latitude": 35.7011,
+        "longitude": -114.8914
+      },
+      {
+        "city": "Laughlin AFB",
+        "icao": "KDFX",
+        "latitude": 29.2728,
+        "longitude": -100.2806
+      },
+      {
+        "city": "Lincoln",
+        "icao": "KILX",
+        "latitude": 40.1506,
+        "longitude": -89.3369
+      },
+      {
+        "city": "Little Rock",
+        "icao": "KLZK",
+        "latitude": 34.8364,
+        "longitude": -92.2622
+      },
+      {
+        "city": "Los Angeles",
+        "icao": "KVTX",
+        "latitude": 34.4117,
+        "longitude": -119.1794
+      },
+      {
+        "city": "Louisville",
+        "icao": "KLVX",
+        "latitude": 37.9753,
+        "longitude": -85.9439
+      },
+      {
+        "city": "Lubbock",
+        "icao": "KLBB",
+        "latitude": 33.6542,
+        "longitude": -101.8142
+      },
+      {
+        "city": "Marquette",
+        "icao": "KMQT",
+        "latitude": 46.5311,
+        "longitude": -87.5483
+      },
+      {
+        "city": "Maxwell AFB",
+        "icao": "KMXX",
+        "latitude": 32.5367,
+        "longitude": -85.7897
+      },
+      {
+        "city": "Medford",
+        "icao": "KMAX",
+        "latitude": 42.0811,
+        "longitude": -122.7172
+      },
+      {
+        "city": "Melbourne",
+        "icao": "KMLB",
+        "latitude": 28.1133,
+        "longitude": -80.6542
+      },
+      {
+        "city": "Memphis",
+        "icao": "KNQA",
+        "latitude": 35.3447,
+        "longitude": -89.8736
+      },
+      {
+        "city": "Miami",
+        "icao": "KAMX",
+        "latitude": 25.6111,
+        "longitude": -80.4125
+      },
+      {
+        "city": "Middleton Island",
+        "icao": "PAIH",
+        "latitude": 59.4614,
+        "longitude": -146.3031
+      },
+      {
+        "city": "Midland/Odessa",
+        "icao": "KMAF",
+        "latitude": 31.9433,
+        "longitude": -102.1892
+      },
+      {
+        "city": "Milwaukee",
+        "icao": "KMKX",
+        "latitude": 42.9678,
+        "longitude": -88.5506
+      },
+      {
+        "city": "Minneapolis/St. Paul",
+        "icao": "KMPX",
+        "latitude": 44.8489,
+        "longitude": -93.5656
+      },
+      {
+        "city": "Minot AFB",
+        "icao": "KMBX",
+        "latitude": 48.3925,
+        "longitude": -100.8650
+      },
+      {
+        "city": "Missoula",
+        "icao": "KMSX",
+        "latitude": 47.0411,
+        "longitude": -113.9861
+      },
+      {
+        "city": "Mobile",
+        "icao": "KMOB",
+        "latitude": 30.6794,
+        "longitude": -88.2397
+      },
+      {
+        "city": "Molokai",
+        "icao": "PHMO",
+        "latitude": 21.1328,
+        "longitude": -157.1800
+      },
+      {
+        "city": "Moody AFB",
+        "icao": "KVAX",
+        "latitude": 30.3903,
+        "longitude": -83.0017
+      },
+      {
+        "city": "Morehead City",
+        "icao": "KMHX",
+        "latitude": 34.7761,
+        "longitude": -76.8761
+      },
+      {
+        "city": "Nashville",
+        "icao": "KOHX",
+        "latitude": 36.2472,
+        "longitude": -86.5625
+      },
+      {
+        "city": "New Orleans",
+        "icao": "KHDC",
+        "latitude": 30.3367,
+        "longitude": -89.8256
+      },
+      {
+        "city": "New York City",
+        "icao": "KOKX",
+        "latitude": 40.8656,
+        "longitude": -72.8639
+      },
+      {
+        "city": "Nome",
+        "icao": "PAEC",
+        "latitude": 64.5114,
+        "longitude": -165.2950
+      },
+      {
+        "city": "Norfolk/Richmond",
+        "icao": "KAKQ",
+        "latitude": 36.9839,
+        "longitude": -77.0072
+      },
+      {
+        "city": "North Platte",
+        "icao": "KLNX",
+        "latitude": 41.9578,
+        "longitude": -100.5764
+      },
+      {
+        "city": "Oklahoma City",
+        "icao": "KTLX",
+        "latitude": 35.3331,
+        "longitude": -97.2778
+      },
+      {
+        "city": "Omaha",
+        "icao": "KOAX",
+        "latitude": 41.3203,
+        "longitude": -96.3667
+      },
+      {
+        "city": "Paducah",
+        "icao": "KPAH",
+        "latitude": 37.0683,
+        "longitude": -88.7719
+      },
+      {
+        "city": "Pendleton",
+        "icao": "KPDT",
+        "latitude": 45.6906,
+        "longitude": -118.8528
+      },
+      {
+        "city": "Philadelphia",
+        "icao": "KDIX",
+        "latitude": 39.9469,
+        "longitude": -74.4108
+      },
+      {
+        "city": "Phoenix",
+        "icao": "KIWA",
+        "latitude": 33.2892,
+        "longitude": -111.6700
+      },
+      {
+        "city": "Pittsburgh",
+        "icao": "KPBZ",
+        "latitude": 40.5317,
+        "longitude": -80.2181
+      },
+      {
+        "city": "Pocatello/Idaho Falls",
+        "icao": "KSFX",
+        "latitude": 43.1056,
+        "longitude": -112.6861
+      },
+      {
+        "city": "Portland, ME",
+        "icao": "KGYX",
+        "latitude": 43.8914,
+        "longitude": -70.2564
+      },
+      {
+        "city": "Portland, OR",
+        "icao": "KRTX",
+        "latitude": 45.7147,
+        "longitude": -122.9653
+      },
+      {
+        "city": "Pueblo",
+        "icao": "KPUX",
+        "latitude": 38.4594,
+        "longitude": -104.1814
+      },
+      {
+        "city": "Raleigh/Durham",
+        "icao": "KRAX",
+        "latitude": 35.6656,
+        "longitude": -78.4897
+      },
+      {
+        "city": "Rapid City",
+        "icao": "KUDX",
+        "latitude": 44.1250,
+        "longitude": -102.8297
+      },
+      {
+        "city": "Reno",
+        "icao": "KRGX",
+        "latitude": 39.7542,
+        "longitude": -119.4622
+      },
+      {
+        "city": "Riverton",
+        "icao": "KRIW",
+        "latitude": 43.0661,
+        "longitude": -108.4772
+      },
+      {
+        "city": "Roanoke",
+        "icao": "KFCX",
+        "latitude": 37.0244,
+        "longitude": -80.2739
+      },
+      {
+        "city": "Robins AFB",
+        "icao": "KJGX",
+        "latitude": 32.6753,
+        "longitude": -83.3511
+      },
+      {
+        "city": "Sacramento",
+        "icao": "KDAX",
+        "latitude": 38.5011,
+        "longitude": -121.6778
+      },
+      {
+        "city": "Saint Louis",
+        "icao": "KLSX",
+        "latitude": 38.6989,
+        "longitude": -90.6828
+      },
+      {
+        "city": "Salt Lake City",
+        "icao": "KMTX",
+        "latitude": 41.2628,
+        "longitude": -112.4478
+      },
+      {
+        "city": "San Angelo",
+        "icao": "KSJT",
+        "latitude": 31.3714,
+        "longitude": -100.4925
+      },
+      {
+        "city": "San Diego",
+        "icao": "KNKX",
+        "latitude": 32.9189,
+        "longitude": -117.0419
+      },
+      {
+        "city": "San Francisco",
+        "icao": "KMUX",
+        "latitude": 37.1553,
+        "longitude": -121.8983
+      },
+      {
+        "city": "San Joaquin Valley",
+        "icao": "KHNX",
+        "latitude": 36.3142,
+        "longitude": -119.6322
+      },
+      {
+        "city": "San Juan",
+        "icao": "TJUA",
+        "latitude": 18.1156,
+        "longitude": -66.0781
+      },
+      {
+        "city": "Santa Ana Mountains",
+        "icao": "KSOX",
+        "latitude": 33.8178,
+        "longitude": -117.6358
+      },
+      {
+        "city": "Seattle/Tacoma",
+        "icao": "KATX",
+        "latitude": 48.1944,
+        "longitude": -122.4958
+      },
+      {
+        "city": "Shreveport",
+        "icao": "KSHV",
+        "latitude": 32.4508,
+        "longitude": -93.8414
+      },
+      {
+        "city": "Sioux Falls",
+        "icao": "KFSD",
+        "latitude": 43.5878,
+        "longitude": -96.7294
+      },
+      {
+        "city": "Sitka",
+        "icao": "PACG",
+        "latitude": 56.8528,
+        "longitude": -135.5292
+      },
+      {
+        "city": "South Kauai",
+        "icao": "PHKI",
+        "latitude": 21.8942,
+        "longitude": -159.5522
+      },
+      {
+        "city": "South Shore",
+        "icao": "PHWA",
+        "latitude": 19.0950,
+        "longitude": -155.5689
+      },
+      {
+        "city": "Spokane",
+        "icao": "KOTX",
+        "latitude": 47.6803,
+        "longitude": -117.6267
+      },
+      {
+        "city": "Springfield",
+        "icao": "KSGF",
+        "latitude": 37.2353,
+        "longitude": -93.4006
+      },
+      {
+        "city": "State College",
+        "icao": "KCCX",
+        "latitude": 40.9231,
+        "longitude": -78.0036
+      },
+      {
+        "city": "Sterling",
+        "icao": "KLWX",
+        "latitude": 38.9753,
+        "longitude": -77.4778
+      },
+      {
+        "city": "Tallahassee",
+        "icao": "KTLH",
+        "latitude": 30.3975,
+        "longitude": -84.3289
+      },
+      {
+        "city": "Tampa",
+        "icao": "KTBW",
+        "latitude": 27.7056,
+        "longitude": -82.4017
+      },
+      {
+        "city": "Topeka",
+        "icao": "KTWX",
+        "latitude": 38.9969,
+        "longitude": -96.2325
+      },
+      {
+        "city": "Tucson",
+        "icao": "KEMX",
+        "latitude": 31.8936,
+        "longitude": -110.6303
+      },
+      {
+        "city": "Tulsa",
+        "icao": "KINX",
+        "latitude": 36.1750,
+        "longitude": -95.5642
+      },
+      {
+        "city": "Vance AFB",
+        "icao": "KVNX",
+        "latitude": 36.7408,
+        "longitude": -98.1278
+      },
+      {
+        "city": "Vandenberg AFB",
+        "icao": "KVBX",
+        "latitude": 34.8381,
+        "longitude": -120.3969
+      },
+      {
+        "city": "Wichita",
+        "icao": "KICT",
+        "latitude": 37.6547,
+        "longitude": -97.4431
+      },
+      {
+        "city": "Wilmington",
+        "icao": "KLTX",
+        "latitude": 33.9889,
+        "longitude": -78.4292
+      },
+      {
+        "city": "Yuma",
+        "icao": "KYUX",
+        "latitude": 32.4953,
+        "longitude": -114.6567
+      },
+      {
+        "city": "Langley Hill",
+        "icao": "KLGX",
+        "latitude": 47.1158,
+        "longitude": -124.1069
+      },
+      {
+        "city": "Evansville",
+        "icao": "KVWX",
+        "latitude": 38.2600,
+        "longitude": -87.7247
+      }
+    ],
+    "metadata": {
+      "total_sites": 160}
+    }

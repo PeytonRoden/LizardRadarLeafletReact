@@ -1,0 +1,123 @@
+html, body, #root {
+  margin: 0;
+  height: 100%;
+  background: #0b0e14;
+  color: #e6e6e6;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.leaflet-popup-content-wrapper {
+  background: #0b1220;
+  color: #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.6);
+}
+
+.leaflet-popup-tip {
+  background: #0b1220;
+}
+
+.radar-popup .popup-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 140px;
+}
+
+.radar-popup .icao {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #7dd3fc;
+}
+
+.radar-popup .city {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.popup-btn {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #0ea5e9, #22d3ee);
+  border: none;
+  color: #020617;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.popup-btn:hover {
+  filter: brightness(1.1);
+}
+
+
+/* Base container */
+.radar-label-icon {
+  background: none;
+  border: none;
+}
+
+/* Bounding box */
+.radar-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: rgba(8, 13, 24, 0.85);
+  backdrop-filter: blur(8px);
+  box-shadow:
+    0 0 0 1px rgba(125, 211, 252, 0.35),
+    0 6px 18px rgba(0,0,0,0.55),
+    0 0 14px rgba(56, 189, 248, 0.25);
+  transition: all 0.2s ease;
+}
+
+/* Gradient outline (pseudo-element) */
+.radar-box::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    #38bdf8,
+    #22d3ee,
+    #0ea5e9
+  );
+  opacity: 0.45;
+  z-index: -1;
+  filter: blur(2px);
+}
+
+/* Radar dot */
+.radar-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+}
+
+/* ICAO text */
+.radar-text {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #e5f2ff;
+}
+
+/* Hover effect */
+.radar-box:hover {
+  transform: scale(1.08);
+  box-shadow:
+    0 0 0 1px rgba(56, 189, 248, 0.9),
+    0 0 24px rgba(56, 189, 248, 0.6);
+}
+
+/* Hover text contrast */
+.radar-box:hover .radar-text {
+  color: #020617;
+}
