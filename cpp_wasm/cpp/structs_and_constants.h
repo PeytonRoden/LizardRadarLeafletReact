@@ -1,3 +1,4 @@
+#pragma once
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -167,7 +168,8 @@ struct RadialBuffer {
     std::vector<float> values;
 };
 
-struct SingleTilt {
+// OLD
+struct SingleTiltOld {
     float ElevationAngle;               // Nominal tilt angle
     int count = 0;
     float maxDist = 0;  //maximum distance in m of this tilt.
@@ -180,6 +182,22 @@ struct SingleTilt {
     std::vector<RadialData> Radials_ZDR;    // All radials for this tilt
     std::vector<RadialData> Radials_PHI;    // All radials for this tilt
     std::vector<RadialData> Radials_RHO;    // All radials for this tilt
+};
+
+
+struct SingleTilt {
+    float ElevationAngle;               // Nominal tilt angle
+    int count = 0;
+    float maxDist = 0;  //maximum distance in m of this tilt.
+    float gateSpacing = 250.0f;
+    MSG_31 msg_31;
+    VOL_EL_RAD vol_el_rad;   //save the first one from each tilt!!!
+    std::vector<float> Radials_REF;    // Packed data, (dist1, azimuth1, value1, dist2, azimuth2, value2, ...)
+    std::vector<float> Radials_VEL;    // Packed data, (dist1, azimuth1, value1, dist2, azimuth2, value2, ...)
+    std::vector<float> Radials_SW;     // Packed data, (dist1, azimuth1, value1, dist2, azimuth2, value2, ...)
+    std::vector<float> Radials_ZDR;    // Packed data, (dist1, azimuth1, value1, dist2, azimuth2, value2, ...)
+    std::vector<float> Radials_PHI;    // Packed data, (dist1, azimuth1, value1, dist2, azimuth2, value2, ...)
+    std::vector<float> Radials_RHO;    // Packed data, (dist1, azimuth1, value1, dist2, azimuth2, value2, ...)
 };
 
 struct AllTilt {
@@ -201,6 +219,13 @@ struct LatLonHeight {
     double lat;
     double lon;
     double height;
+};
+
+
+struct RadarBin {
+    double range_m;
+    double azimuth_deg;
+    double height_m;
 };
 
 #pragma pack(pop)
@@ -227,7 +252,7 @@ inline bool cStringsEqual(const char* str1, const char* str2) {
     return std::strcmp(str1, str2) == 0;
 }
 
-inline std::vector<RadialData>* get_moment_radials(SingleTilt& tilt, const char* moment_buf) {
+inline std::vector<float>* get_moment_radials(SingleTilt& tilt, const char* moment_buf) {
     if (cStringsEqual(moment_buf, "REF")) return &tilt.Radials_REF;
     if (cStringsEqual(moment_buf, "VEL")) return &tilt.Radials_VEL;
     if (cStringsEqual(moment_buf, "SW ")) return &tilt.Radials_SW;
@@ -237,7 +262,7 @@ inline std::vector<RadialData>* get_moment_radials(SingleTilt& tilt, const char*
     return nullptr;
 }
 
-inline const std::vector<RadialData>* get_moment_radials(const SingleTilt& tilt, const char* moment_buf) {
+inline const std::vector<float>* get_moment_radials(const SingleTilt& tilt, const char* moment_buf) {
     if (cStringsEqual(moment_buf, "REF")) return &tilt.Radials_REF;
     if (cStringsEqual(moment_buf, "VEL")) return &tilt.Radials_VEL;
     if (cStringsEqual(moment_buf, "SW ")) return &tilt.Radials_SW;

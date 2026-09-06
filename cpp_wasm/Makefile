@@ -112,6 +112,9 @@ EMCC_LDFLAGS := \
                           '_get_packed_radar_data_size', \
                           '_get_tilt_angles', \
                           '_get_tilt_angles_size', \
+                          '_populate_voxel_grid', \
+                          '_get_voxel_grid', \
+                          '_get_interpolated_voxels_size', \
                           '_malloc', \
                           '_free']" \
   -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap','HEAPU8','lengthBytesUTF8','stringToUTF8','HEAPF32']" \

@@ -82,3 +82,28 @@ export function readCurrentDataTiltAngle(module) {
   }
   return module._get_current_tilt_angle();
 }
+
+export function populateVoxelGrid(module) {
+  if (!module._populate_voxel_grid) {
+    throw new Error("Populate voxel grid WASM export is unavailable");
+  }
+  module._populate_voxel_grid();
+}
+
+
+export function getInterpolatedVoxels(module) {
+  if (!module._get_interpolated_voxels) {
+    throw new Error("Get interpolated voxels WASM export is unavailable");
+  }
+  const ptr = module._get_interpolated_voxels();
+  const size = module._get_interpolated_voxels_size();
+  
+  if (!ptr || size === 0) {
+    return new Float32Array();
+  }
+  
+  // Copy immediately. The pointer belongs to WASM memory and is regenerated
+  // the next time get_moment_data() is called.
+  return new Float32Array(module.HEAPF32.buffer, ptr, size).slice();
+}
+

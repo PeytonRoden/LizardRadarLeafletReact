@@ -3,7 +3,7 @@
 #include <vector>
 #include <cstdint>
 #include <string>
-#include "structs_and_constants.cpp"
+#include "structs_and_constants.h"
 
 extern char selected_radar_moment[4];
 extern float * moment_data_vertices_then_val;

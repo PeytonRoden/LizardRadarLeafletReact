@@ -265,29 +265,40 @@ std::vector<uint8_t> saveTiltAsPNGInterpolate2(const SingleTilt& tilt, const std
     std::vector<RadialCache> radial_cache;
     radial_cache.reserve(selected_radial->size());
 
-    for (const auto& radial : *selected_radial) {
-        if (std::isnan(radial.value)) continue;
+    //for (const auto& radial : *selected_radial) {
+    float azimuth_deg;
+    float dist;
+    float value;
+
+    for (size_t i = 0; i + 2 < selected_radial->size(); i += 3) {
+        azimuth_deg = (*selected_radial)[i];
+        dist = (*selected_radial)[i + 1];
+        value = (*selected_radial)[i + 2];
+        
+        if (std::isnan(value)) continue;
+
+
 
         //float az_rad = radial.azimuth_deg * M_PI / 180.0f;
-        float az_rad = (90.0f - radial.azimuth_deg) * M_PI / 180.0f;
+        float az_rad = (90.0f - azimuth_deg) * M_PI / 180.0f;
         float cos_az_rad = std::cos(az_rad);
         float sin_az_rad = std::sin(az_rad);
 
-        float inner_r = std::max(0.0f, radial.dist - half_gate);
-        float outer_r = radial.dist + half_gate;
+        float inner_r = std::max(0.0f, dist - half_gate);
+        float outer_r = dist + half_gate;
 
         // bounding box corners (in meters from origin)
-        float x_plusrad_plusdist = (radial.dist+ half_gate) * std::cos(az_rad + beam_half_width_rad)  + center_x;
-        float x_plusrad_minusdist = (radial.dist- half_gate) * std::cos(az_rad + beam_half_width_rad)+ center_x;
+        float x_plusrad_plusdist = (dist + half_gate) * std::cos(az_rad + beam_half_width_rad)  + center_x;
+        float x_plusrad_minusdist = (dist - half_gate) * std::cos(az_rad + beam_half_width_rad)+ center_x;
         
-        float x_minusrad_plusdist = (radial.dist+ half_gate)  * std::cos(az_rad - beam_half_width_rad)+ center_x;
-        float x_minusrad_minusdist = (radial.dist-  half_gate)  * std::cos(az_rad - beam_half_width_rad)+ center_x;
+        float x_minusrad_plusdist = (dist + half_gate)  * std::cos(az_rad - beam_half_width_rad)+ center_x;
+        float x_minusrad_minusdist = (dist -  half_gate)  * std::cos(az_rad - beam_half_width_rad)+ center_x;
 
-        float y_plusrad_plusdist = (radial.dist+ half_gate) *std::sin(az_rad + beam_half_width_rad)+ center_y;
-        float y_plusrad_minusdist = (radial.dist- half_gate) *std::sin(az_rad + beam_half_width_rad)+ center_y;
+        float y_plusrad_plusdist = (dist + half_gate) *std::sin(az_rad + beam_half_width_rad)+ center_y;
+        float y_plusrad_minusdist = (dist - half_gate) *std::sin(az_rad + beam_half_width_rad)+ center_y;
 
-        float y_minusrad_plusdist = (radial.dist+ half_gate) * std::sin(az_rad - beam_half_width_rad)+ center_y;
-        float y_minusrad_minusdist = (radial.dist- half_gate) * std::sin(az_rad - beam_half_width_rad)+ center_y;
+        float y_minusrad_plusdist = (dist + half_gate) * std::sin(az_rad - beam_half_width_rad)+ center_y;
+        float y_minusrad_minusdist = (dist - half_gate) * std::sin(az_rad - beam_half_width_rad)+ center_y;
 
         float min_x = std::min({x_plusrad_minusdist, x_plusrad_plusdist, x_minusrad_minusdist, x_minusrad_plusdist});
         float max_x = std::max({x_plusrad_minusdist, x_plusrad_plusdist, x_minusrad_minusdist, x_minusrad_plusdist});
@@ -299,7 +310,7 @@ std::vector<uint8_t> saveTiltAsPNGInterpolate2(const SingleTilt& tilt, const std
             cos_az_rad,
             inner_r,
             outer_r,
-            radial.value,
+            value,
             inner_r * inner_r,
             outer_r * outer_r,
             min_x,
@@ -565,13 +576,22 @@ float* buildMomentDataVerticesThenValue(const SingleTilt& tilt, int* output_size
         return nullptr;
     }
 
-    for (const auto& radial : *selected_radial) {
-        if (std::isnan(radial.value)) continue;
+    //for (const auto& radial : *selected_radial) {
+    float aziumuth_deg;
+    float dist;
+    float value;
+
+    for (size_t i = 0; i + 2 < selected_radial->size(); i += 3) {
+        aziumuth_deg = (*selected_radial)[i];
+        dist = (*selected_radial)[i + 1];
+        value = (*selected_radial)[i + 2];
+        
+        if (std::isnan(value)) continue;
 
         //float az_rad = radial.azimuth_deg * M_PI / 180.0f;
-        float az_rad = radial.azimuth_deg * M_PI / 180.0f;
-        float inner_r = std::max(0.0f, radial.dist - half_gate);
-        float outer_r = radial.dist + half_gate;
+        float az_rad = aziumuth_deg * M_PI / 180.0f;
+        float inner_r = std::max(0.0f, dist - half_gate);
+        float outer_r = dist + half_gate;
 
 
         const double inner_az = static_cast<double>(az_rad) - beam_half_width_rad;
@@ -612,17 +632,17 @@ float* buildMomentDataVerticesThenValue(const SingleTilt& tilt, int* output_size
         moment_data.push_back({(float)bottom_left_latlon.lat,   (float)bottom_left_latlon.lon,
                             (float)top_left_latlon.lat,      (float)top_left_latlon.lon,
                             (float)middle_bottom_latlon.lat, (float)middle_bottom_latlon.lon,
-                            (float)radial.value});
+                            value});
 
         moment_data.push_back({(float)top_left_latlon.lat,      (float)top_left_latlon.lon,
                             (float)middle_bottom_latlon.lat, (float)middle_bottom_latlon.lon,
                             (float)top_right_latlon.lat,     (float)top_right_latlon.lon,
-                            (float)radial.value});
+                            value});
 
         moment_data.push_back({(float)middle_bottom_latlon.lat, (float)middle_bottom_latlon.lon,
                             (float)top_right_latlon.lat,     (float)top_right_latlon.lon,
                             (float)bottom_right_latlon.lat,  (float)bottom_right_latlon.lon,
-                            (float)radial.value});
+                            value});
 
         }
 
@@ -667,12 +687,21 @@ std::vector<float> new_shader_vals(const SingleTilt& tilt) {
 
     std::vector<float> shader_vals;
 
-    for (const auto& radial : *selected_radial) {
-        if (std::isnan(radial.value)) continue;
+    // for (const auto& radial : *selected_radial) {
+    float aziumuth_deg;
+    float dist;
+    float value;
 
-        shader_vals.push_back((float)radial.dist);
-        shader_vals.push_back((float)radial.azimuth_deg);
-        shader_vals.push_back((float)radial.value);
+    for (size_t i = 0; i + 2 < selected_radial->size(); i += 3) {
+        aziumuth_deg = (*selected_radial)[i];
+        dist = (*selected_radial)[i + 1];
+        value = (*selected_radial)[i + 2];
+        
+        if (std::isnan(value)) continue;
+
+        shader_vals.push_back(dist);
+        shader_vals.push_back(aziumuth_deg);
+        shader_vals.push_back(value);
     }
 
     return shader_vals;

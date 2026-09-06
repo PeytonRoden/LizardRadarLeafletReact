@@ -1,5 +1,7 @@
 
 #include "nexrad_image_builder.h"
+#include "voxel_interpolation.h"
+#include "structs_and_constants.h"
 #include <iostream>
 #include <ctime>
 #include <iomanip>
@@ -13,6 +15,7 @@
 #include <cstdlib>
 #include <queue>
 #include <thread>
+#include <chrono>
 
 
 #include <emscripten.h>
@@ -395,7 +398,7 @@ void parse_one_moment(AllTilt& alltilts, const uint8_t* ref_ptr , MSG_31& msg31,
         //increment count
         current_tilt.count++;
 
-        std::vector<RadialData>* radials = get_moment_radials(current_tilt, moment_buf);
+        std::vector<float>* radials = get_moment_radials(current_tilt, moment_buf);
  
 
         if (radials->capacity() == 0) {
@@ -426,10 +429,10 @@ void parse_one_moment(AllTilt& alltilts, const uint8_t* ref_ptr , MSG_31& msg31,
 
             float distance_m = i * MOMENT.gate_spacing; // gate_spacing in meters
 
-            RadialData point;
-            point.azimuth_deg = msg31.azimuth_angle;
-            point.dist = distance_m;
-            point.value = moment_val;
+            // RadialData point;
+            // point.azimuth_deg = msg31.azimuth_angle;
+            // point.dist = distance_m;
+            // point.value = moment_val;
 
             // std::cout << "point.azimuth_deg: "<< point.azimuth_deg << std::endl;
             // std::cout << "point.dist: "<< point.dist << std::endl;
@@ -437,9 +440,10 @@ void parse_one_moment(AllTilt& alltilts, const uint8_t* ref_ptr , MSG_31& msg31,
 
             if (distance_m > current_tilt.maxDist) current_tilt.maxDist = distance_m;
 
-            radials->push_back(point);
+            radials->push_back(msg31.azimuth_angle);
+            radials->push_back(distance_m);
+            radials->push_back(moment_val);
         }
-
 }
 
 
@@ -612,12 +616,12 @@ void printReflectivitySummary(const AllTilt& reflectivity_data) {
 
         // Print a few example radar points, e.g., 5 samples
         size_t step = std::max((size_t)1, tilt.Radials_REF.size() / 25);
-        for (size_t i = 0; i < tilt.Radials_REF.size(); i += step) {
-            const RadialData& pt = tilt.Radials_REF[i];
-            std::cout << "    Azimuth: " << std::fixed << std::setprecision(2) << pt.azimuth_deg
-                      << "°, Dist: " << pt.dist << " m, Value: " << pt.value << " dBZ\n";
-        }
-        std::cout << "\n";
+        // for (size_t i = 0; i < tilt.Radials_REF.size(); i += step) {
+        //     const float& pt = tilt.Radials_REF[i];
+        //     std::cout << "    Azimuth: " << std::fixed << std::setprecision(2) << pt.azimuth_deg
+        //               << "°, Dist: " << pt.dist << " m, Value: " << pt.value << " dBZ\n";
+        // }
+        // std::cout << "\n";
     }
 
     std::cout << "=== End of Summary ===\n";
@@ -668,7 +672,7 @@ AllTilt combine_all_tilts_from_thread_results(std::vector<AllTilt>& thread_resul
 
     std::cout << "Processing result with " << pre_combined.Tilts.size() << " tilts" << std::endl;
 
-    auto append_radials = [](std::vector<RadialData>& dst, const std::vector<RadialData>& src) {
+    auto append_radials = [](std::vector<float>& dst, const std::vector<float>& src) {
         dst.insert(dst.end(), src.begin(), src.end());
     };
 
@@ -740,6 +744,11 @@ AllTilt combine_all_tilts_from_thread_results(std::vector<AllTilt>& thread_resul
 
 
     }
+
+    // sort tilt_info by tilt angle
+    std::sort(tilt_info.begin(), tilt_info.end(), [](const TiltInfo& a, const TiltInfo& b) {
+        return a.tilt < b.tilt;
+    });
 
     return combined;
 }
@@ -893,6 +902,55 @@ extern "C" {
             return 0.0f;
         }
         return combined.Tilts[tilt_number_for_data].vol_el_rad.vol.lon;
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    int get_interpolated_voxels_size() {
+        return num_voxels_per_side;
+    }
+    
+    EMSCRIPTEN_KEEPALIVE
+    void populate_voxel_grid() {
+        if (combined.Tilts.empty() || tilt_number_for_data < 0 ||
+            tilt_number_for_data >= static_cast<int>(combined.Tilts.size())) {
+            return;
+        }
+
+        interpolate_radar_data_to_voxels(
+            combined.Tilts[tilt_number_for_data].vol_el_rad.vol.lat + 1.0f,
+            combined.Tilts[tilt_number_for_data].vol_el_rad.vol.lon + 1.0f,
+            combined.Tilts[tilt_number_for_data].vol_el_rad.vol.lat - 1.0f,
+            combined.Tilts[tilt_number_for_data].vol_el_rad.vol.lon - 1.0f,
+            num_voxels_per_side
+        );
+
+        using namespace std::chrono_literals; 
+        std::this_thread::sleep_for(2.5s);    // Sleep for 2.5 seconds
+
+        std::cout << "Sleep complete" << std::endl;
+
+
+        interpolate_radar_data_to_voxels(
+            combined.Tilts[tilt_number_for_data].vol_el_rad.vol.lat + 1.5f,
+            combined.Tilts[tilt_number_for_data].vol_el_rad.vol.lon + 1.5f,
+            combined.Tilts[tilt_number_for_data].vol_el_rad.vol.lat + 0.5f,
+            combined.Tilts[tilt_number_for_data].vol_el_rad.vol.lon + 0.5f,
+            num_voxels_per_side
+        );
+
+
+        return;
+
+        // return RadarVoxelVolume;
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    float * get_voxel_grid() {
+        if (combined.Tilts.empty() || tilt_number_for_data < 0 ||
+            tilt_number_for_data >= static_cast<int>(combined.Tilts.size())) {
+            return nullptr;
+        }
+        return RadarVoxelVolume;
     }
   
     EMSCRIPTEN_KEEPALIVE

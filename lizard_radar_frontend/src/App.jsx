@@ -7,6 +7,7 @@ import MapView from "./components/MapView";
 import SelectionsPanel from "./components/selections/SelectionsPanel";
 import WasmImageContainer from "./components/image_display/WASMImageContainer";
 import ShaderPlane from "./components/radar_display/canvas";
+import ThreeDButton from "./components/3DRadarDisplay/3DButton";
 
 import { useRef, useCallback } from "react";
 
@@ -58,6 +59,7 @@ export default function App() {
 
 
   return  <div style={{ position: "relative" }}>
+    <ThreeDButton ensureWasmLoaded={ensureWasmLoaded} />
     <div style={{ position: "relative" }}>
       <MapView
         ensureWasmLoaded={ensureWasmLoaded}
