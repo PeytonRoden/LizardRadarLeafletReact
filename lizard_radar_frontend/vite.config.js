@@ -33,6 +33,10 @@ export default defineConfig({
         target: "http://localhost:8002",
         changeOrigin: true,
       },
+      "/available": {
+        target: "http://localhost:8002",
+        changeOrigin: true,
+      },
       "/nexrad": {
         target: "http://localhost:8002",
         changeOrigin: true,

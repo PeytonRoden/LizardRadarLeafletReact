@@ -123,14 +123,14 @@
       {
         "city": "Camp Humphreys",
         "icao": "RKSG",
-        "latitude": 36.9558,
-        "longitude": 127.0178
+        "latitude": 37.2076,
+        "longitude": 127.2856
       },
       {
         "city": "Cannon AFB",
         "icao": "KFDX",
         "latitude": 34.6353,
-        "longitude": -103.6297
+        "longitude": -103.6189
       },
       {
         "city": "Cedar City",
@@ -446,7 +446,7 @@
       },
       {
         "city": "Kamuela",
-        "icao": "PHKN",
+        "icao": "PHKM",
         "latitude": 20.1256,
         "longitude": -155.7778
       },
@@ -627,8 +627,8 @@
       {
         "city": "Moody AFB",
         "icao": "KVAX",
-        "latitude": 30.3903,
-        "longitude": -83.0017
+        "latitude": 30.8903,
+        "longitude": -83.0018
       },
       {
         "city": "Morehead City",
@@ -643,10 +643,10 @@
         "longitude": -86.5625
       },
       {
-        "city": "New Orleans",
+        "city": "Hammond",
         "icao": "KHDC",
-        "latitude": 30.3367,
-        "longitude": -89.8256
+        "latitude": 30.5193,
+        "longitude": -90.4074
       },
       {
         "city": "New York City",

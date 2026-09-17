@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import sites from "../data/nexradSites.json";
 import { fakeRadarData } from "../utils/fakeRadarData";
+import { downloadNexrad, getHistoricalScanUrl, getLatestScanUrl } from "../api/nexradApi";
 
 import { 
   readMomentData,
@@ -91,16 +92,6 @@ function radarLabelIcon(icao) {
   });
 }
 
-async function fetchWithTimeout(url, options = {}, timeoutMs = 20000) {
-  const controller = new AbortController();
-  const t = window.setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    window.clearTimeout(t);
-  }
-}
-
 function readCString(module, pointer) {
   if (!pointer) return "";
 
@@ -117,40 +108,35 @@ function readTiltInfo(module) {
   }));
 }
 
-async function fetchLatestRadar(icao) {
+async function fetchLatestRadar(icao, signal) {
   // 1. Ask backend for latest filename
 
   console.log("backend: ", icao)
 
   console.time(`latest:${icao}`);
-  const metaRes = await fetchWithTimeout(`/latest/${icao}`);
+  const url = await getLatestScanUrl(icao, signal);
   console.timeEnd(`latest:${icao}`);
 
-  if (!metaRes.ok) {
-    throw new Error(`/latest/${icao} failed: ${metaRes.status} ${metaRes.statusText}`);
-  }
-
-  const meta = await metaRes.json();
-
-  if (meta.error) throw new Error(meta.error);
-  if (!meta.url) throw new Error(`/latest/${icao} returned no url`);
-
   // 2. Fetch binary via proxy
-  const binUrl = `/nexrad?url=${encodeURIComponent(meta.url)}`;
   console.time(`nexrad:${icao}`);
-  const binRes = await fetchWithTimeout(binUrl, {}, 60000);
+  const buffer = await downloadNexrad(url, signal);
   console.timeEnd(`nexrad:${icao}`);
 
-  if (!binRes.ok) {
-    throw new Error(`${binUrl} failed: ${binRes.status} ${binRes.statusText}`);
-  }
-
-  return await binRes.arrayBuffer();
+  return buffer;
 }
 
-export default function RadarSitesLayer({ onSelect, onRadarData, onMomentData, onPackedRadarData, onCurrentDataTiltAngle, onCurrentRadarStationLatitude, onCurrentRadarStationLongitude, onTiltAngles, onTiltInfo, ensureWasmLoaded, selectedMoment, selectedTiltAngle })  {
+async function fetchHistoricalRadar({ icao, year, month, day, time }, signal) {
+  const url = await getHistoricalScanUrl(icao, year, month, day, time, signal);
+  return downloadNexrad(url, signal);
+}
+
+export default function RadarSitesLayer({ onSelect, onRadarData, onMomentData, onPackedRadarData, onCurrentDataTiltAngle, onCurrentRadarStationLatitude, onCurrentRadarStationLongitude, onTiltAngles, onTiltInfo, onRadarLoadState, ensureWasmLoaded, selectedMoment, selectedTiltAngle, radarLoadRequest })  {
   const moduleRef = useRef(null);
   const hasRadarDataRef = useRef(false);
+  const handlersRef = useRef({});
+  const selectionRef = useRef({ selectedMoment, selectedTiltAngle });
+  handlersRef.current = { onRadarData, onMomentData, onPackedRadarData, onCurrentDataTiltAngle, onCurrentRadarStationLatitude, onCurrentRadarStationLongitude, onTiltAngles, onTiltInfo, onRadarLoadState };
+  selectionRef.current = { selectedMoment, selectedTiltAngle };
 
   function setWasmMoment(module, moment) {
     if (!module._set_selected_radar_moment || !module.lengthBytesUTF8 || !module.stringToUTF8) {
@@ -193,6 +179,117 @@ export default function RadarSitesLayer({ onSelect, onRadarData, onMomentData, o
     }
   }, [selectedMoment, selectedTiltAngle]);
 
+  useEffect(() => {
+    if (!radarLoadRequest) return;
+    const controller = new AbortController();
+
+    async function loadRadar() {
+      const handlers = handlersRef.current;
+      try {
+        handlers.onRadarLoadState?.("downloading");
+        const buffer = radarLoadRequest.mode === "historical"
+          ? await fetchHistoricalRadar(radarLoadRequest, controller.signal)
+          : await fetchLatestRadar(radarLoadRequest.icao, controller.signal);
+        if (controller.signal.aborted) return;
+
+        handlers.onRadarLoadState?.("parsing");
+        const module = ensureWasmLoaded
+          ? await ensureWasmLoaded()
+          : null;
+        if (!module) {
+          throw new Error("WASM module is unavailable");
+        }
+
+        moduleRef.current = module;
+        console.log("buffer: ", buffer)
+
+        const bytes = new Uint8Array(buffer);
+
+        console.log("module object", module);
+
+        console.log(
+          "heap before malloc",
+          module.HEAPU8.buffer.byteLength / 1024 / 1024,
+          "MB"
+        );
+
+        console.log(
+          "incoming bytes",
+          bytes.byteLength / 1024 / 1024,
+          "MB"
+        );
+
+        const ptr = module._malloc(bytes.byteLength);
+
+        console.log("ptr", ptr);
+
+        console.log(
+          "heap after malloc",
+          module.HEAPU8.buffer.byteLength / 1024 / 1024,
+          "MB"
+        );
+        try {
+          module.HEAPU8.set(bytes, ptr);
+          setWasmMoment(module, selectionRef.current.selectedMoment);
+
+          console.log(`parse_nexrad start: ${radarLoadRequest.icao}, bytes=${bytes.byteLength}`);
+          console.time(`parse_nexrad:${radarLoadRequest.icao}`);
+          module._parse_nexrad(ptr, bytes.byteLength);
+          if (controller.signal.aborted) return;
+
+          const momentData = readMomentData(module);
+          handlers.onMomentData?.(momentData);
+          const packedRadarData = readPackedRadarData(module);
+
+          const currentDataTiltAngle = readCurrentDataTiltAngle(module);
+          handlers.onCurrentDataTiltAngle?.(currentDataTiltAngle);
+
+          const tiltAngles = readTiltAngles(module);
+          handlers.onTiltAngles?.(Array.from(tiltAngles));
+          handlers.onTiltInfo?.(readTiltInfo(module));
+          
+          const currentRadarStationLatitude = readRadarStationLatitude(module);
+          handlers.onCurrentRadarStationLatitude?.(currentRadarStationLatitude);
+          
+          const currentRadarStationLongitude = readRadarStationLongitude(module);
+          handlers.onCurrentRadarStationLongitude?.(currentRadarStationLongitude);
+
+          handlers.onPackedRadarData?.(packedRadarData);
+          hasRadarDataRef.current = true;
+
+
+
+          console.timeEnd(`parse_nexrad:${radarLoadRequest.icao}`);
+          console.log(`parse_nexrad end: ${radarLoadRequest.icao}`);
+        } finally {
+          module._free(ptr);
+        }
+
+        // Pass to WASM
+        console.log(buffer)
+
+        // fake radar for now
+        const site = sites.nexrad_sites.find(({ icao }) => icao === radarLoadRequest.icao);
+        if (site) {
+          const heat = fakeRadarData(
+              site.latitude,
+              site.longitude
+          );
+          handlers.onRadarData?.(heat);
+        }
+        handlers.onRadarLoadState?.("success");
+      } catch (error) {
+        if (error.name !== "AbortError" && !controller.signal.aborted) {
+          console.error("RadarSitesLayer load failed", error);
+          handlers.onRadarLoadState?.("error", error.message ?? String(error));
+        }
+      }
+    }
+
+    loadRadar();
+    return () => controller.abort();
+  }, [ensureWasmLoaded, radarLoadRequest]);
+
   return (
     <>
       {sites.nexrad_sites.map(site => (
@@ -200,103 +297,14 @@ export default function RadarSitesLayer({ onSelect, onRadarData, onMomentData, o
           key={site.icao}
           position={[site.latitude, site.longitude]}
           icon={radarLabelIcon(site.icao)}
-            eventHandlers={{
-            click: async () => {
-                try {
-                  onSelect?.(site);
-
-                  console.log("inside click handler, for radar clicker")
-
-
-                  const buffer = await fetchLatestRadar(site.icao);
-
-                  const module = ensureWasmLoaded
-                    ? await ensureWasmLoaded()
-                    : null;
-                  if (!module) {
-                    console.error("WASM module not loaded, in radar site selection");
-                    return;
-                  } else {
-                    console.log("WASM module loaded, in radar site selection");
-                  }
-
-                  moduleRef.current = module;
-                  console.log("buffer: ", buffer)
-
-                  const bytes = new Uint8Array(buffer);
-
-                  console.log("module object", module);
-
-                  console.log(
-                    "heap before malloc",
-                    module.HEAPU8.buffer.byteLength / 1024 / 1024,
-                    "MB"
-                  );
-
-                  console.log(
-                    "incoming bytes",
-                    bytes.byteLength / 1024 / 1024,
-                    "MB"
-                  );
-
-                  const ptr = module._malloc(bytes.byteLength);
-
-                  console.log("ptr", ptr);
-
-                  console.log(
-                    "heap after malloc",
-                    module.HEAPU8.buffer.byteLength / 1024 / 1024,
-                    "MB"
-                  );
-                  try {
-                    module.HEAPU8.set(bytes, ptr);
-
-                    console.log(`parse_nexrad start: ${site.icao}, bytes=${bytes.byteLength}`);
-                    console.time(`parse_nexrad:${site.icao}`);
-                    module._parse_nexrad(ptr, bytes.byteLength);
-                    const momentData = readMomentData(module);
-                    onMomentData?.(momentData);
-                    const packedRadarData = readPackedRadarData(module);
-
-                    const currentDataTiltAngle = readCurrentDataTiltAngle(module);
-                    onCurrentDataTiltAngle?.(currentDataTiltAngle);
-
-                    const tiltAngles = readTiltAngles(module);
-                    onTiltAngles?.(Array.from(tiltAngles));
-                    onTiltInfo?.(readTiltInfo(module));
-                    
-                    const currentRadarStationLatitude = readRadarStationLatitude(module);
-                    onCurrentRadarStationLatitude?.(currentRadarStationLatitude);
-                    
-                    const currentRadarStationLongitude = readRadarStationLongitude(module);
-                    onCurrentRadarStationLongitude?.(currentRadarStationLongitude);
-
-                    onPackedRadarData?.(packedRadarData);
-                    hasRadarDataRef.current = true;
-
-
-
-                    console.timeEnd(`parse_nexrad:${site.icao}`);
-                    console.log(`parse_nexrad end: ${site.icao}`);
-                  } finally {
-                    module._free(ptr);
-                  }
-
-                  // Pass to WASM
-                  console.log(buffer)
-
-                  // fake radar for now
-                  const heat = fakeRadarData(
-                      site.latitude,
-                      site.longitude
-                  );
-
-                  onRadarData?.(heat);
-                } catch (err) {
-                  console.error('RadarSitesLayer click failed', err);
-                }
+          eventHandlers={{
+            click: () => {
+              onSelect?.(site);
             },
-            }}
+            mouseout: (event) => {
+              event.target.closePopup();
+            },
+          }}
         >
           <Popup className="radar-popup">
             <div className="popup-content">

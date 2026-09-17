@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { loadNexradWasm } from '../../wasm/nexrad';
 
 
@@ -157,8 +157,9 @@ function WasmImageContainer({ ensureWasmLoaded }) {
   }
 
   return (
-    <div>
-      <div>
+    <div className="wasm-image-container">
+      <h2>WASM image renderer</h2>
+      <div className="wasm-image-container__selections">
         <select
           value={selectedRadarMoment}
           onChange={(event) => setSelectedRadarMoment(event.target.value)}
@@ -190,9 +191,16 @@ function WasmImageContainer({ ensureWasmLoaded }) {
 
       </div>
 
-      <button onClick={handleLoadImage}>
-        Load Image
-      </button>
+      <div className="wasm-image-container__actions">
+        <button type="button" onClick={handleLoadImage}>
+          Load image
+        </button>
+        {imageSrc && (
+          <a href={imageSrc} download={`lizard-radar-${selectedRadarMoment}-tilt-${selectedTiltIndex}.png`}>
+            Download PNG
+          </a>
+        )}
+      </div>
       {imageSrc ? (
         <img src={imageSrc} alt="Rendered from WASM" />
       ) : (

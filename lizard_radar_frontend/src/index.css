@@ -6,6 +6,10 @@ html, body, #root {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+.radar-map .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.55) saturate(0.35);
+}
+
 .leaflet-popup-content-wrapper {
   background: #0b1220;
   color: #e5e7eb;
@@ -112,12 +116,19 @@ html, body, #root {
 /* Hover effect */
 .radar-box:hover {
   transform: scale(1.08);
+  background: rgba(8, 13, 24, 0.85);
+  backdrop-filter: blur(8px);
   box-shadow:
     0 0 0 1px rgba(56, 189, 248, 0.9),
     0 0 24px rgba(56, 189, 248, 0.6);
 }
 
+.radar-box:hover::before {
+  opacity: 0.45;
+}
+
 /* Hover text contrast */
 .radar-box:hover .radar-text {
-  color: #020617;
+  color: #e5f2ff;
+  opacity: 1;
 }

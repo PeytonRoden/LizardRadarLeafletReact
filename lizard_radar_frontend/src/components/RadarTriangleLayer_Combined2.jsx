@@ -306,7 +306,7 @@ function getWorldToClipMatrix(map) {
   ]);
 }
 
-export default function RadarTriangleLayer({ data , elevation_angle, latitude_center, longitude_center, color_map, radar_moment }) {
+export default function RadarTriangleLayer({ data , elevation_angle, latitude_center, longitude_center, color_map, radar_moment, opacity = 1 }) {
   const map = useMap();
   const canvasRef = useRef(null);
 
@@ -533,6 +533,10 @@ export default function RadarTriangleLayer({ data , elevation_angle, latitude_ce
       canvasRef.current = null;
     };
   }, [packed_radar_data, map, elevationAngle, latitudeCenter, longitudeCenter, colorMap, radarMoment]);
+
+  useEffect(() => {
+    if (canvasRef.current) canvasRef.current.style.opacity = String(Math.min(1, Math.max(0, opacity)));
+  }, [opacity]);
 
   return null;
 }

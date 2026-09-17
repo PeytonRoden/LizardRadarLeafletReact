@@ -16,7 +16,7 @@ function parseColorLine(tokens) {
   const value = parseFloat(tokens[1]);
   const nums = tokens.slice(2).map(Number);
   let rgb, rgbTo = null, alpha = 255;
-  if (tokens[0].startsWith('color4')) {
+  if (tokens[0].toLowerCase().startsWith('color4')) {
     rgb = nums.slice(0, 3);
     alpha = nums[3] ?? 255;
   } else {
