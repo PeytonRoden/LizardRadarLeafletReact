@@ -61,8 +61,6 @@ export default function App() {
       return wasmPromiseRef.current;
     }
 
-    console.time("loadNexradWasm");
-
     wasmPromiseRef.current = loadNexradWasm()
       .then((m) => {
         console.timeEnd("loadNexradWasm");

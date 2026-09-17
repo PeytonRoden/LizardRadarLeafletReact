@@ -132,3 +132,51 @@ docker stop lizard-radar-web lizard-radar-api
 ```
 
 Because the containers were started with `--rm`, Docker removes them after they stop. The images remain available and can be run again with the same `docker run` commands.
+
+
+### GCLOUD:
+
+gcloud compute firewall-rules create allow-lizard-radar-web \
+  --direction=INGRESS \
+  --priority=1000 \
+  --network=default \
+  --action=ALLOW \
+  --rules=tcp:80,tcp:443 \
+  --source-ranges=0.0.0.0/0 \
+  --target-tags=http-server,https-server
+
+
+
+# Caddyfile
+
+lizardradar.com {
+    reverse_proxy lizard-radar-web:80
+}
+
+
+docker run --detach \
+  --restart unless-stopped \
+  --name lizard-radar-caddy \
+  --network lizard-radar \
+  --publish 80:80 \
+  --publish 443:443 \
+  --volume "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" \
+  --volume caddy_data:/data \
+  --volume caddy_config:/config \
+  caddy:2.10-alpine
+
+
+docker run --detach \
+  --restart unless-stopped \
+  --name lizard-radar-web \
+  --network lizard-radar \
+  --env FASTAPI_HOST=lizard-radar-api \
+  --env FASTAPI_PORT=8002 \
+  lizard-radar-web
+
+docker run --detach \
+  --restart unless-stopped \
+  --name lizard-radar-api \
+  --network lizard-radar \
+  --publish 8002:8002 \
+  lizard-radar-api

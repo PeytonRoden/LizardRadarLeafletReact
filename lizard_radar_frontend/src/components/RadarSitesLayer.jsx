@@ -6,7 +6,6 @@ import { fakeRadarData } from "../utils/fakeRadarData";
 import { downloadNexrad, getHistoricalScanUrl, getLatestScanUrl } from "../api/nexradApi";
 
 import { 
-  readMomentData,
   readPackedRadarData,
   readRadarStationLatitude,
   readRadarStationLongitude,
@@ -111,16 +110,10 @@ function readTiltInfo(module) {
 async function fetchLatestRadar(icao, signal) {
   // 1. Ask backend for latest filename
 
-  console.log("backend: ", icao)
-
-  console.time(`latest:${icao}`);
   const url = await getLatestScanUrl(icao, signal);
-  console.timeEnd(`latest:${icao}`);
 
   // 2. Fetch binary via proxy
-  console.time(`nexrad:${icao}`);
   const buffer = await downloadNexrad(url, signal);
-  console.timeEnd(`nexrad:${icao}`);
 
   return buffer;
 }
@@ -130,12 +123,12 @@ async function fetchHistoricalRadar({ icao, year, month, day, time }, signal) {
   return downloadNexrad(url, signal);
 }
 
-export default function RadarSitesLayer({ onSelect, onRadarData, onMomentData, onPackedRadarData, onCurrentDataTiltAngle, onCurrentRadarStationLatitude, onCurrentRadarStationLongitude, onTiltAngles, onTiltInfo, onRadarLoadState, ensureWasmLoaded, selectedMoment, selectedTiltAngle, radarLoadRequest })  {
+export default function RadarSitesLayer({ onSelect, onRadarData, onPackedRadarData, onCurrentDataTiltAngle, onCurrentRadarStationLatitude, onCurrentRadarStationLongitude, onTiltAngles, onTiltInfo, onRadarLoadState, ensureWasmLoaded, selectedMoment, selectedTiltAngle, radarLoadRequest })  {
   const moduleRef = useRef(null);
   const hasRadarDataRef = useRef(false);
   const handlersRef = useRef({});
   const selectionRef = useRef({ selectedMoment, selectedTiltAngle });
-  handlersRef.current = { onRadarData, onMomentData, onPackedRadarData, onCurrentDataTiltAngle, onCurrentRadarStationLatitude, onCurrentRadarStationLongitude, onTiltAngles, onTiltInfo, onRadarLoadState };
+  handlersRef.current = { onRadarData, onPackedRadarData, onCurrentDataTiltAngle, onCurrentRadarStationLatitude, onCurrentRadarStationLongitude, onTiltAngles, onTiltInfo, onRadarLoadState };
   selectionRef.current = { selectedMoment, selectedTiltAngle };
 
   function setWasmMoment(module, moment) {
@@ -167,7 +160,6 @@ export default function RadarSitesLayer({ onSelect, onRadarData, onMomentData, o
 
     const packedRadarData = readPackedRadarData(module);
     onPackedRadarData?.(packedRadarData);
-    onMomentData?.(readMomentData(module));
     onCurrentDataTiltAngle?.(readCurrentDataTiltAngle(module));
     onCurrentRadarStationLatitude?.(readRadarStationLatitude(module));
     onCurrentRadarStationLongitude?.(readRadarStationLongitude(module));
@@ -201,44 +193,16 @@ export default function RadarSitesLayer({ onSelect, onRadarData, onMomentData, o
         }
 
         moduleRef.current = module;
-        console.log("buffer: ", buffer)
 
         const bytes = new Uint8Array(buffer);
-
-        console.log("module object", module);
-
-        console.log(
-          "heap before malloc",
-          module.HEAPU8.buffer.byteLength / 1024 / 1024,
-          "MB"
-        );
-
-        console.log(
-          "incoming bytes",
-          bytes.byteLength / 1024 / 1024,
-          "MB"
-        );
-
         const ptr = module._malloc(bytes.byteLength);
-
-        console.log("ptr", ptr);
-
-        console.log(
-          "heap after malloc",
-          module.HEAPU8.buffer.byteLength / 1024 / 1024,
-          "MB"
-        );
         try {
           module.HEAPU8.set(bytes, ptr);
           setWasmMoment(module, selectionRef.current.selectedMoment);
 
-          console.log(`parse_nexrad start: ${radarLoadRequest.icao}, bytes=${bytes.byteLength}`);
-          console.time(`parse_nexrad:${radarLoadRequest.icao}`);
           module._parse_nexrad(ptr, bytes.byteLength);
           if (controller.signal.aborted) return;
 
-          const momentData = readMomentData(module);
-          handlers.onMomentData?.(momentData);
           const packedRadarData = readPackedRadarData(module);
 
           const currentDataTiltAngle = readCurrentDataTiltAngle(module);
@@ -256,17 +220,9 @@ export default function RadarSitesLayer({ onSelect, onRadarData, onMomentData, o
 
           handlers.onPackedRadarData?.(packedRadarData);
           hasRadarDataRef.current = true;
-
-
-
-          console.timeEnd(`parse_nexrad:${radarLoadRequest.icao}`);
-          console.log(`parse_nexrad end: ${radarLoadRequest.icao}`);
         } finally {
           module._free(ptr);
         }
-
-        // Pass to WASM
-        console.log(buffer)
 
         // fake radar for now
         const site = sites.nexrad_sites.find(({ icao }) => icao === radarLoadRequest.icao);

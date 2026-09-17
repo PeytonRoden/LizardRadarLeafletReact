@@ -288,7 +288,7 @@ function createProgram(gl) {
   return program;
 }
 
-function getWorldToClipMatrix(map) {
+function getWorldToClipMatrix(map, out = new Float32Array(16)) {
   const zoom = map.getZoom();
   const center = map.getCenter();
   const size = map.getSize();
@@ -298,17 +298,19 @@ function getWorldToClipMatrix(map) {
   const right = left + size.x;
   const bottom = top + size.y;
 
-  return new Float32Array([
+  out.set([
     2 / (right - left), 0, 0, 0,
     0, -2 / (bottom - top), 0, 0,
     0, 0, 1, 0,
     -(right + left) / (right - left), (bottom + top) / (bottom - top), 0, 1,
   ]);
+  return out;
 }
 
 export default function RadarTriangleLayer({ data , elevation_angle, latitude_center, longitude_center, color_map, radar_moment, opacity = 1 }) {
   const map = useMap();
   const canvasRef = useRef(null);
+  const glRef = useRef(null);
 
   const packed_radar_data = useMemo(() => {
     if (data instanceof Float32Array && data.length % 3 === 0) {
@@ -352,7 +354,16 @@ export default function RadarTriangleLayer({ data , elevation_angle, latitude_ce
     return RADAR_MOMENT;
   }, [radar_moment]);
 
+  const selectedColorMap = useMemo(() => {
+    const [colorMapMoment, colorMapName] = colorMap.split("/");
+    return getColorMap(colorMapMoment, colorMapName)
+      ?? getColorMap(radarMoment, colorMapName)
+      ?? Object.values(colorMaps[radarMoment] ?? {})[0];
+  }, [colorMap, radarMoment]);
 
+  // Create the canvas, WebGL context and program once per map. Data, color map
+  // and per-frame uniforms are updated in the effects below without recreating
+  // the context, so no GPU/CPU resources are churned on every radar load.
   useEffect(() => {
     const pane = map.getPanes().overlayPane;
     const canvas = document.createElement("canvas");
@@ -376,52 +387,30 @@ export default function RadarTriangleLayer({ data , elevation_angle, latitude_ce
     }
 
     const program = createProgram(gl);
-    const buffer = gl.createBuffer();
-
-    if (!buffer) {
-      throw new Error("Unable to create WebGL buffer");
-    }
-
-    // 3 triangles drawn per call
-    const totalBins= packed_radar_data.length/3;
-
-    const TEXTURE_WIDTH = 1024;
-    const textureHeight = Math.ceil(totalBins / TEXTURE_WIDTH);
-
-    // Pad your Float32Array if it doesn't perfectly fill the last row
-    const paddedSize = TEXTURE_WIDTH * textureHeight * 3;
-    const textureData = new Float32Array(paddedSize);
-    textureData.set(packed_radar_data);
 
     const dataTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, dataTexture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-
-    gl.texImage2D(
-      gl.TEXTURE_2D, 0, gl.RGB32F,
-      TEXTURE_WIDTH, textureHeight, 0, 
-      gl.RGB, gl.FLOAT, textureData
-    );
-
-    const [colorMapMoment, colorMapName] = colorMap.split("/");
-    const selectedColorMap = getColorMap(colorMapMoment, colorMapName)
-      ?? getColorMap(radarMoment, colorMapName)
-      ?? Object.values(colorMaps[radarMoment] ?? {})[0];
-    if (!selectedColorMap) {
-      return undefined;
-    }
-    const colorTableTexture = createColorTableTexture(gl, selectedColorMap.dense);
-
+    gl.bindTexture(gl.TEXTURE_2D, null);
 
     // Empty VAO mandatory for webgl2 gl_VertexID dummy draws
     const vao = gl.createVertexArray();
 
-
     const state = {
+      gl,
+      canvas,
       program,
       dataTexture,
+      colorTableTexture: null,
       vao,
+      totalBins: 0,
+      textureWidth: 1024,
+      elevationAngle: ELEVATION_ANGLE,
+      latitudeCenter: LATITUDE_CENTER,
+      longitudeCenter: LONGITUDE_CENTER,
+      range: { min: 0, max: 1 },
+      matrix: new Float32Array(16),
       elevationAngleLocation: gl.getUniformLocation(program, "u_elevationAngle"),
       latitudeCenterLocation: gl.getUniformLocation(program, "u_latitudeCenter"),
       longtidueCenterLocation: gl.getUniformLocation(program, "u_longitudeCenter"),
@@ -478,32 +467,37 @@ export default function RadarTriangleLayer({ data , elevation_angle, latitude_ce
 
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
+      if (!state.colorTableTexture || state.totalBins === 0) return;
+
       gl.useProgram(program);
-      gl.uniformMatrix4fv(state.matrixLocation, false, getWorldToClipMatrix(map));
-      gl.uniform1f(state.elevationAngleLocation, elevationAngle)
-      gl.uniform1f(state.latitudeCenterLocation, latitudeCenter)
-      gl.uniform1f(state.longtidueCenterLocation, longitudeCenter)
-      gl.uniform1i(state.totalBinsLocation, totalBins)
-      gl.uniform1i(state.textureWidthLocation, TEXTURE_WIDTH)
+      gl.uniformMatrix4fv(state.matrixLocation, false, getWorldToClipMatrix(map, state.matrix));
+      gl.uniform1f(state.elevationAngleLocation, state.elevationAngle)
+      gl.uniform1f(state.latitudeCenterLocation, state.latitudeCenter)
+      gl.uniform1f(state.longtidueCenterLocation, state.longitudeCenter)
+      gl.uniform1i(state.totalBinsLocation, state.totalBins)
+      gl.uniform1i(state.textureWidthLocation, state.textureWidth)
       gl.uniform1f(state.gateSizeLocation, GATE_SIZE)
       gl.uniform1f(state.azimuthStepSizeLocation, AZIMUTH_STEP_SIZE)
       gl.uniform1f(state.worldSizeLocation, 256 * Math.pow(2, map.getZoom()));
-      gl.uniform1f(state.minValueLocation, selectedColorMap.range.min);
-      gl.uniform1f(state.maxValueLocation, selectedColorMap.range.max);
+      gl.uniform1f(state.minValueLocation, state.range.min);
+      gl.uniform1f(state.maxValueLocation, state.range.max);
 
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, state.dataTexture);
       gl.uniform1i(state.textureLocation, 0); // 0 corresponds to gl.TEXTURE0
       gl.activeTexture(gl.TEXTURE1);
-      gl.bindTexture(gl.TEXTURE_2D, colorTableTexture);
+      gl.bindTexture(gl.TEXTURE_2D, state.colorTableTexture);
       gl.uniform1i(state.colorTableLocation, 1);
       gl.bindVertexArray(vao);
 
 
       // Draw 6 vertices per bin
-      gl.drawArrays(gl.TRIANGLES, 0, totalBins * 6);
+      gl.drawArrays(gl.TRIANGLES, 0, state.totalBins * 6);
     }
+
+    state.draw = draw;
+    glRef.current = state;
 
     draw();
     map.on("move", draw);
@@ -521,18 +515,92 @@ export default function RadarTriangleLayer({ data , elevation_angle, latitude_ce
         pane.removeChild(canvas);
       }
 
-      gl.deleteBuffer(buffer);
-      gl.deleteTexture(dataTexture);
-      gl.deleteTexture(colorTableTexture);
+      gl.deleteTexture(state.dataTexture);
+      if (state.colorTableTexture) gl.deleteTexture(state.colorTableTexture);
       gl.deleteVertexArray(vao);
       gl.deleteProgram(program);
 
       const loseContext = gl.getExtension("WEBGL_lose_context");
       if (loseContext) loseContext.loseContext();
 
+      glRef.current = null;
       canvasRef.current = null;
     };
-  }, [packed_radar_data, map, elevationAngle, latitudeCenter, longitudeCenter, colorMap, radarMoment]);
+  }, [map]);
+
+  // Upload radar bins into the data texture whenever the packed data changes.
+  useEffect(() => {
+    const state = glRef.current;
+    if (!state) return;
+    const { gl } = state;
+
+    // 3 triangles drawn per call
+    const totalBins = packed_radar_data.length / 3;
+    const TEXTURE_WIDTH = state.textureWidth;
+    const textureHeight = Math.max(1, Math.ceil(totalBins / TEXTURE_WIDTH));
+
+    gl.bindTexture(gl.TEXTURE_2D, state.dataTexture);
+
+    if (totalBins % TEXTURE_WIDTH === 0) {
+      // Data already fills every row; upload it directly without a padded copy.
+      gl.texImage2D(
+        gl.TEXTURE_2D, 0, gl.RGB32F,
+        TEXTURE_WIDTH, textureHeight, 0,
+        gl.RGB, gl.FLOAT, packed_radar_data
+      );
+    } else {
+      // Allocate the texture, then upload the full rows and the partial last
+      // row separately so the source array never has to be copied and padded.
+      const fullRows = Math.floor(totalBins / TEXTURE_WIDTH);
+      gl.texImage2D(
+        gl.TEXTURE_2D, 0, gl.RGB32F,
+        TEXTURE_WIDTH, textureHeight, 0,
+        gl.RGB, gl.FLOAT, null
+      );
+      if (fullRows > 0) {
+        gl.texSubImage2D(
+          gl.TEXTURE_2D, 0, 0, 0,
+          TEXTURE_WIDTH, fullRows,
+          gl.RGB, gl.FLOAT, packed_radar_data, 0
+        );
+      }
+      gl.texSubImage2D(
+        gl.TEXTURE_2D, 0, 0, fullRows,
+        totalBins - fullRows * TEXTURE_WIDTH, 1,
+        gl.RGB, gl.FLOAT, packed_radar_data, fullRows * TEXTURE_WIDTH * 3
+      );
+    }
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+    state.totalBins = totalBins;
+    state.draw();
+  }, [packed_radar_data]);
+
+  // Rebuild the (tiny) color table texture when the palette changes.
+  useEffect(() => {
+    const state = glRef.current;
+    if (!state) return;
+    const { gl } = state;
+
+    if (state.colorTableTexture) {
+      gl.deleteTexture(state.colorTableTexture);
+      state.colorTableTexture = null;
+    }
+    if (selectedColorMap) {
+      state.colorTableTexture = createColorTableTexture(gl, selectedColorMap.dense);
+      state.range = selectedColorMap.range;
+    }
+    state.draw();
+  }, [selectedColorMap]);
+
+  useEffect(() => {
+    const state = glRef.current;
+    if (!state) return;
+    state.elevationAngle = elevationAngle;
+    state.latitudeCenter = latitudeCenter;
+    state.longitudeCenter = longitudeCenter;
+    state.draw();
+  }, [elevationAngle, latitudeCenter, longitudeCenter]);
 
   useEffect(() => {
     if (canvasRef.current) canvasRef.current.style.opacity = String(Math.min(1, Math.max(0, opacity)));

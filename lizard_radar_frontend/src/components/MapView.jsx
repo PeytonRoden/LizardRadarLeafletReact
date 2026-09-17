@@ -22,7 +22,6 @@ function MapResizeHandler() {
 
 export default function MapView({ ensureWasmLoaded, onTiltAngles, onTiltInfo, selectedMoment, selectedTiltAngle, selectedColorMap, radarOpacity, radarLoadRequest, onRadarSiteSelect, onRadarLoadState, showVoxelSelection, voxelBounds, onVoxelBoundsChange, onRadarLatitudeChange, onRadarLongitudeChange }) {
   const [, setHeatData] = useState([]);
-  const [, setMomentData] = useState(new Float32Array());
   const [momentDataPacked, setMomentDataPacked] = useState(new Float32Array());
   const [latitudeCenter, setLatitudeCenter] = useState(39.5);
   const [longitudeCenter, setLongitudeCenter] = useState(-98.35);
@@ -52,7 +51,6 @@ export default function MapView({ ensureWasmLoaded, onTiltAngles, onTiltInfo, se
       <RadarSitesLayer
         onSelect={handleSelect}
         onRadarData={setHeatData}
-        onMomentData={setMomentData}
         onPackedRadarData={setMomentDataPacked}
         onCurrentDataTiltAngle={setTiltAngle}
         onCurrentRadarStationLatitude={(latitude) => {

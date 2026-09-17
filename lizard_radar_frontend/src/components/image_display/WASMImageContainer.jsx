@@ -10,7 +10,6 @@ async function loadWasm(ensureWasmLoaded) {
     console.error("WASM module not loaded, in radar site selection");
     return null;
     } else {
-    console.log("WASM module loaded, in radar site selection");
     return module;
     }
 }
