@@ -674,37 +674,13 @@ float* buildMomentDataVerticesThenValue(const SingleTilt& tilt, int* output_size
 }
 
        
-//stop gap method, eventually store single titl info like this
-// dist, az, value
-std::vector<float> new_shader_vals(const SingleTilt& tilt) {
-
-    auto selected_radial = get_moment_radials(tilt, selected_radar_moment);
+const std::vector<float>* new_shader_vals(const SingleTilt& tilt) {
+    const auto* selected_radial = get_moment_radials(tilt, selected_radar_moment);
     if (selected_radial == nullptr) {
         std::cerr << "Invalid moment: " << selected_radar_moment << std::endl;
-        return std::vector<float>();
     }
 
-
-    std::vector<float> shader_vals;
-
-    // for (const auto& radial : *selected_radial) {
-    float aziumuth_deg;
-    float dist;
-    float value;
-
-    for (size_t i = 0; i + 2 < selected_radial->size(); i += 3) {
-        aziumuth_deg = (*selected_radial)[i];
-        dist = (*selected_radial)[i + 1];
-        value = (*selected_radial)[i + 2];
-        
-        if (std::isnan(value)) continue;
-
-        shader_vals.push_back(dist);
-        shader_vals.push_back(aziumuth_deg);
-        shader_vals.push_back(value);
-    }
-
-    return shader_vals;
+    return selected_radial;
 }
         
 

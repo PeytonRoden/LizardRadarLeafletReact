@@ -87,10 +87,6 @@ float height_radius_scale = 1.0f;
 
 AllTilt combined;
 
-//temporary storage for packed radar data (dist, az, value), will migrate allTilt to use packed later
-std::vector<float> packed_radar_data;
-
-
 // --- Helpers to read big endian values from raw buffer ---
 
 uint16_t read_be16(const uint8_t* p) {
@@ -149,13 +145,13 @@ std::vector<uint8_t> decompress_bzip2_block(const uint8_t* input, size_t input_s
 #include <cstdint>
 
 // Returns the file offsets of all BZip2 compressed blocks (indicated by 'BZh' + digit)
-std::pair<std::vector<size_t>, std::vector<int>> find_bzip2_block_offsets(const std::vector<uint8_t>& data) {
+std::pair<std::vector<size_t>, std::vector<int>> find_bzip2_block_offsets(const uint8_t* data, size_t data_size) {
     std::vector<size_t> offsets;
     std::vector<int> block_sizes;
 
     const size_t start_scan = 28;  // Skip volume header
 
-    for (size_t i = start_scan; i + 4 < data.size(); ++i) {
+    for (size_t i = start_scan; i + 4 < data_size; ++i) {
         if (data[i] == 'B' && data[i + 1] == 'Z' && data[i + 2] == 'h') {
             if (data[i + 3] >= '1' && data[i + 3] <= '9') {
                 offsets.push_back(i);
@@ -421,11 +417,6 @@ void parse_one_moment(AllTilt& alltilts, const uint8_t* ref_ptr , MSG_31& msg31,
         current_tilt.count++;
 
         std::vector<float>* radials = get_moment_radials(current_tilt, moment_buf);
- 
-
-        if (radials->capacity() == 0) {
-            radials->reserve(500000);
-        }
 
         //store tilt information
         // i is gate number
@@ -653,7 +644,7 @@ void printReflectivitySummary(const AllTilt& reflectivity_data) {
 
 
 
-void unzip_process_ldm_worker(size_t i, const size_t* bz2_offsets_array, const int* bz2_block_sizes_array, const std::vector<uint8_t>& buffer, AllTilt& process_ldm_block_result){
+void unzip_process_ldm_worker(size_t i, const size_t* bz2_offsets_array, const int* bz2_block_sizes_array, const uint8_t* buffer, size_t buffer_size, AllTilt& process_ldm_block_result){
 
     AllTilt all_tilt_data;
 
@@ -662,10 +653,10 @@ void unzip_process_ldm_worker(size_t i, const size_t* bz2_offsets_array, const i
     // Use a max chunk window; 1MB should be more than enough
     //size_t max_block_len = 1024 * 1024;  // 1MB
     size_t max_block_len = bz2_block_sizes_array[i];  // 1MB
-    size_t remaining = buffer.size() - start;
+    size_t remaining = buffer_size - start;
     size_t chunk_len = std::min(max_block_len, remaining);
 
-    const uint8_t* chunk_ptr = buffer.data() + start;
+    const uint8_t* chunk_ptr = buffer + start;
 
     // //std::cout << "Decompressing block " << i + 1
     //         << " at offset " << start << ", max chunk: " << chunk_len << std::endl;
@@ -741,6 +732,17 @@ AllTilt combine_all_tilts_from_thread_results(std::vector<AllTilt>& thread_resul
     std::sort(combined.Tilts.begin(), combined.Tilts.end(), [](const SingleTilt& a, const SingleTilt& b) {
         return a.ElevationAngle < b.ElevationAngle;
     });
+
+    // Drop over-allocated vector capacity; these vectors are retained for the
+    // lifetime of the scan and wasm linear memory can never shrink.
+    for (auto& tilt : combined.Tilts) {
+        tilt.Radials_REF.shrink_to_fit();
+        tilt.Radials_VEL.shrink_to_fit();
+        tilt.Radials_SW.shrink_to_fit();
+        tilt.Radials_ZDR.shrink_to_fit();
+        tilt.Radials_PHI.shrink_to_fit();
+        tilt.Radials_RHO.shrink_to_fit();
+    }
 
 
 
@@ -913,18 +915,22 @@ extern "C" {
     const float * get_packed_radar_data() {
         if (combined.Tilts.empty() || tilt_number_for_data < 0 ||
             tilt_number_for_data >= static_cast<int>(combined.Tilts.size())) {
-            packed_radar_data.clear();
-            return packed_radar_data.data();
+            return nullptr;
         }
 
-        packed_radar_data = new_shader_vals(combined.Tilts[tilt_number_for_data]);
-
-        return packed_radar_data.data();
+        const auto* packed_radar_data = new_shader_vals(combined.Tilts[tilt_number_for_data]);
+        return packed_radar_data == nullptr ? nullptr : packed_radar_data->data();
     }
 
     EMSCRIPTEN_KEEPALIVE
     int get_packed_radar_data_size() {
-        return packed_radar_data.size();
+        if (combined.Tilts.empty() || tilt_number_for_data < 0 ||
+            tilt_number_for_data >= static_cast<int>(combined.Tilts.size())) {
+            return 0;
+        }
+
+        const auto* packed_radar_data = new_shader_vals(combined.Tilts[tilt_number_for_data]);
+        return packed_radar_data == nullptr ? 0 : static_cast<int>(packed_radar_data->size());
     }
 
     EMSCRIPTEN_KEEPALIVE
@@ -1073,6 +1079,16 @@ extern "C" {
             return -1;
         }
 
+        // Free the previous scan BEFORE parsing the new one. Wasm linear
+        // memory can grow but never shrink, so if the old and new volumes
+        // coexist during the parse, that peak becomes permanent.
+        combined.Tilts.clear();
+        tilt_info.clear();
+        delete[] moment_data_vertices_then_val;
+        moment_data_vertices_then_val = nullptr;
+        moment_data_vertices_then_val_size = 0;
+        release_voxel_grid();
+
         //initialize all tilt angles as -1, these get reupdated each time a new icao gets run
         // for(int i = 0; i< 50; i++){
         //     tilt_angles[i] = -1;
@@ -1081,9 +1097,6 @@ extern "C" {
         //clear tilt angles
         tilt_angles.clear();
 
-        
-        //uint8_t* data_ptr = buffer.data();
-        std::vector<uint8_t> buffer(data, data + length);
 
         uint8_t* data_ptr = data;
         VolumeHeader vol_header;
@@ -1107,7 +1120,7 @@ extern "C" {
 
         //std::vector<size_t> bz2_offsets,  = find_bzip2_block_offsets(buffer);  // already implemented
 
-        auto [bz2_offsets, bz2_block_sizes] = find_bzip2_block_offsets(buffer); 
+        auto [bz2_offsets, bz2_block_sizes] = find_bzip2_block_offsets(data, static_cast<size_t>(length)); 
         
         std::vector<std::thread> threads_to_process_blocks;
         std::vector<AllTilt> process_ldm_blocks_results(bz2_offsets.size());
@@ -1125,7 +1138,8 @@ extern "C" {
                 i,
                 bz2_offsets.data(),
                 bz2_block_sizes.data(),
-                std::cref(buffer),
+                data,
+                static_cast<size_t>(length),
                 std::ref(process_ldm_blocks_results[i])
             );
 

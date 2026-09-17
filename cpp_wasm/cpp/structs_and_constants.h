@@ -192,12 +192,12 @@ struct SingleTilt {
     float gateSpacing = 250.0f;
     MSG_31 msg_31;
     VOL_EL_RAD vol_el_rad;   //save the first one from each tilt!!!
-    std::vector<float> Radials_REF;    // Packed data, (dist1, azimuth1, value1, dist2, azimuth2, value2, ...)
-    std::vector<float> Radials_VEL;    // Packed data, (dist1, azimuth1, value1, dist2, azimuth2, value2, ...)
-    std::vector<float> Radials_SW;     // Packed data, (dist1, azimuth1, value1, dist2, azimuth2, value2, ...)
-    std::vector<float> Radials_ZDR;    // Packed data, (dist1, azimuth1, value1, dist2, azimuth2, value2, ...)
-    std::vector<float> Radials_PHI;    // Packed data, (dist1, azimuth1, value1, dist2, azimuth2, value2, ...)
-    std::vector<float> Radials_RHO;    // Packed data, (dist1, azimuth1, value1, dist2, azimuth2, value2, ...)
+    std::vector<float> Radials_REF;    // Packed data, (azimuth1, dist1, value1, azimuth2, dist2, value2, ...)
+    std::vector<float> Radials_VEL;    // Packed data, (azimuth1, dist1, value1, azimuth2, dist2, value2, ...)
+    std::vector<float> Radials_SW;     // Packed data, (azimuth1, dist1, value1, azimuth2, dist2, value2, ...)
+    std::vector<float> Radials_ZDR;    // Packed data, (azimuth1, dist1, value1, azimuth2, dist2, value2, ...)
+    std::vector<float> Radials_PHI;    // Packed data, (azimuth1, dist1, value1, azimuth2, dist2, value2, ...)
+    std::vector<float> Radials_RHO;    // Packed data, (azimuth1, dist1, value1, azimuth2, dist2, value2, ...)
 };
 
 struct AllTilt {

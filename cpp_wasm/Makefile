@@ -130,7 +130,7 @@ EMCC_LDFLAGS := \
                           '_malloc', \
                           '_free']" \
   -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap','HEAPU8','lengthBytesUTF8','stringToUTF8','HEAPF32']" \
-  -s INITIAL_MEMORY=128MB \
+  -s INITIAL_MEMORY=32MB \
   -s MAXIMUM_MEMORY=2GB \
   -s ALLOW_MEMORY_GROWTH=1
 
