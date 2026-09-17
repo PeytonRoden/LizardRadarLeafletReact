@@ -154,6 +154,12 @@ lizardradar.com {
 }
 
 
+
+```sh
+docker network create lizard-radar
+```
+
+```sh
 docker run --detach \
   --restart unless-stopped \
   --name lizard-radar-caddy \
@@ -164,8 +170,10 @@ docker run --detach \
   --volume caddy_data:/data \
   --volume caddy_config:/config \
   caddy:2.10-alpine
+```
 
 
+```sh
 docker run --detach \
   --restart unless-stopped \
   --name lizard-radar-web \
@@ -173,10 +181,13 @@ docker run --detach \
   --env FASTAPI_HOST=lizard-radar-api \
   --env FASTAPI_PORT=8002 \
   lizard-radar-web
+```
 
+```sh
 docker run --detach \
   --restart unless-stopped \
   --name lizard-radar-api \
   --network lizard-radar \
   --publish 8002:8002 \
   lizard-radar-api
+```
