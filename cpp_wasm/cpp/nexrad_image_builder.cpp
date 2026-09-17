@@ -214,12 +214,12 @@ std::vector<uint8_t> saveTiltAsPNGInterpolate2(const SingleTilt& tilt, const std
 
 
     //Count number of moment values for each moment
-    std::cout << "Number of moment values for REF: " << tilt.Radials_REF.size() << std::endl;
-    std::cout << "Number of moment values for VEL: " << tilt.Radials_VEL.size() << std::endl;
-    std::cout << "Number of moment values for SW: " << tilt.Radials_SW.size() << std::endl;
-    std::cout << "Number of moment values for RHO: " << tilt.Radials_RHO.size() << std::endl;
-    std::cout << "Number of moment values for ZDR: " << tilt.Radials_ZDR.size() << std::endl;
-    std::cout << "Number of moment values for PHI: " << tilt.Radials_PHI.size() << std::endl;
+    //std::cout << "Number of moment values for REF: " << tilt.Radials_REF.size() << std::endl;
+    //std::cout << "Number of moment values for VEL: " << tilt.Radials_VEL.size() << std::endl;
+    //std::cout << "Number of moment values for SW: " << tilt.Radials_SW.size() << std::endl;
+    //std::cout << "Number of moment values for RHO: " << tilt.Radials_RHO.size() << std::endl;
+    //std::cout << "Number of moment values for ZDR: " << tilt.Radials_ZDR.size() << std::endl;
+    //std::cout << "Number of moment values for PHI: " << tilt.Radials_PHI.size() << std::endl;
 
     const int CENTER = SIZE / 2;
 
@@ -230,7 +230,7 @@ std::vector<uint8_t> saveTiltAsPNGInterpolate2(const SingleTilt& tilt, const std
     const float beam_half_width_rad = 0.5f * M_PI / 180.0f; // 0.5 degree, not 0.5 radians
 
     int nyquist_vel = tilt.vol_el_rad.rad.nyquist_vel;
-    std::cout << "nyquist: " << nyquist_vel << std::endl;
+    //std::cout << "nyquist: " << nyquist_vel << std::endl;
 
     struct GridPoint {
         float value = 0.0f;
@@ -433,7 +433,7 @@ std::vector<uint8_t> saveTiltAsPNGInterpolate2(const SingleTilt& tilt, const std
         image.data(), SIZE * 4
     );
 
-    std::cout << "Saved RGBA image with transparency to buffer." << std::endl;
+    //std::cout << "Saved RGBA image with transparency to buffer." << std::endl;
 
     return png_buffer;
 }
@@ -536,18 +536,18 @@ float* buildMomentDataVerticesThenValue(const SingleTilt& tilt, int* output_size
 
 
     //Count number of moment values for each moment
-    std::cout << "Number of moment values for REF: " << tilt.Radials_REF.size() << std::endl;
-    std::cout << "Number of moment values for VEL: " << tilt.Radials_VEL.size() << std::endl;
-    std::cout << "Number of moment values for SW: " << tilt.Radials_SW.size() << std::endl;
-    std::cout << "Number of moment values for RHO: " << tilt.Radials_RHO.size() << std::endl;
-    std::cout << "Number of moment values for ZDR: " << tilt.Radials_ZDR.size() << std::endl;
-    std::cout << "Number of moment values for PHI: " << tilt.Radials_PHI.size() << std::endl;
+    //std::cout << "Number of moment values for REF: " << tilt.Radials_REF.size() << std::endl;
+    //std::cout << "Number of moment values for VEL: " << tilt.Radials_VEL.size() << std::endl;
+    //std::cout << "Number of moment values for SW: " << tilt.Radials_SW.size() << std::endl;
+    //std::cout << "Number of moment values for RHO: " << tilt.Radials_RHO.size() << std::endl;
+    //std::cout << "Number of moment values for ZDR: " << tilt.Radials_ZDR.size() << std::endl;
+    //std::cout << "Number of moment values for PHI: " << tilt.Radials_PHI.size() << std::endl;
 
 
     const float beam_half_width_rad = 0.5f * M_PI / 180.0f; // 0.5 degree, not 0.5 radians
 
     int nyquist_vel = tilt.vol_el_rad.rad.nyquist_vel;
-    std::cout << "nyquist: " << nyquist_vel << std::endl;
+    //std::cout << "nyquist: " << nyquist_vel << std::endl;
 
     struct GridPoint {
         float value = 0.0f;

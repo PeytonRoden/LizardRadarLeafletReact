@@ -52,16 +52,38 @@ int moment_data_vertices_then_val_size = 0;
 
 
 std::vector<uint8_t> png_buffer;
-int num_voxels_per_side = 96;
+int MAX_NUM_VOXELS_PER_SIDE = 96;
+int num_voxels_latitude = 96;
+int num_voxels_longitude = 96;
+int num_voxels_height = 96;
 
-//float* RadarVoxelVolume = new float[num_voxels_per_side * num_voxels_per_side * num_voxels_per_side]; // stored as nxnxn, calculate index as (x * n * n) + (y * n) + z;
-float* RadarVoxelVolume;
+float* RadarVoxelVolume = nullptr;
 
 float latitude_topleft;
 float longitude_topleft;
 
 float latitude_bottomright;
 float longitude_bottomright;
+
+
+//L_v(r) = Lv_0 + k_Lv * r
+//L_h(r) = Lh_0 + k_Lh * r
+// w_i = exp( - ( ((x-x_i)^2 + (y-y_i)^2 )/ (L_h^2)) + ((z-z_i)^2 / (L_v^2))  )
+// Z(x) = sum_i( w_i * Z_i ) / sum_i( w_i )
+// Lv_0/Lh_0 are in km, k_Lv/k_Lh are km of influence added per km of range.
+float Lv_0 = 1.0f;
+float Lh_0 = 1.5f;
+
+
+float k_Lv = 0.00005f;
+float k_Lh = 0.0001f;
+
+
+float latlong_radius_0 = 5.0f;
+float height_radius_0 = 10.0f;
+float latlong_radius_scale = 1.0f;
+float height_radius_scale = 1.0f;
+
 
 AllTilt combined;
 
@@ -240,7 +262,7 @@ std::vector<uint8_t> read_and_decompress(std::ifstream& file) {
 
     // Check if BZ2 compressed
     if (comp_rec[CONTROL_WORD_SIZE] == 'B' && comp_rec[CONTROL_WORD_SIZE+1] == 'Z') {
-        std::cout << "Detected BZip2 compression\n";
+        //std::cout << "Detected BZip2 compression\n";
         std::vector<uint8_t> decompressed;
 
         // Read each block and decompress
@@ -262,7 +284,7 @@ std::vector<uint8_t> read_and_decompress(std::ifstream& file) {
     } else if ((comp_rec[CONTROL_WORD_SIZE] == 0x00 && comp_rec[CONTROL_WORD_SIZE+1] == 0x00) ||
                (comp_rec[CONTROL_WORD_SIZE] == 0x09 && comp_rec[CONTROL_WORD_SIZE+1] == 0x80)) {
         // Uncompressed data follows
-        std::cout << "Data is uncompressed\n";
+        //std::cout << "Data is uncompressed\n";
         return std::vector<uint8_t>((std::istreambuf_iterator<char>(file)), {});
     }
 
@@ -294,8 +316,8 @@ VOL_EL_RAD parse_vol_el_rad_blocks(const uint8_t* p_vol, const uint8_t* p_el, co
     std::memcpy(vol.spare, p_vol, 2); p_vol += 2;
 
     vol_el_rad.vol = vol;
-    // std::cout << "lat: " << vol.lat << std::endl;
-    // std::cout << "lon: " << vol.lon << std::endl;
+    // //std::cout << "lat: " << vol.lat << std::endl;
+    // //std::cout << "lon: " << vol.lon << std::endl;
 
     
     ELEVATION_DATA_BLOCK el;
@@ -324,8 +346,8 @@ VOL_EL_RAD parse_vol_el_rad_blocks(const uint8_t* p_vol, const uint8_t* p_el, co
 
     //rad.nyquist_vel = rad.nyquist_vel/100;
 
-    // std::cout << "block type: " << rad.block_type << std::endl;
-    // std::cout << "name: " << rad.data_name << std::endl;
+    // //std::cout << "block type: " << rad.block_type << std::endl;
+    // //std::cout << "name: " << rad.data_name << std::endl;
     //std::cout << "nyquist vel: " << rad.nyquist_vel << std::endl;
 
     return vol_el_rad;
@@ -420,7 +442,7 @@ void parse_one_moment(AllTilt& alltilts, const uint8_t* ref_ptr , MSG_31& msg31,
                 raw_val = read_be16((uint8_t*)(data_ptr + i*2));
             }
             else {
-                std::cout << "Unsupported word size: " << int(MOMENT.word_size) << std::endl;
+                //std::cout << "Unsupported word size: " << int(MOMENT.word_size) << std::endl;
                 continue;
             }
             if (raw_val == 0) continue;
@@ -434,9 +456,9 @@ void parse_one_moment(AllTilt& alltilts, const uint8_t* ref_ptr , MSG_31& msg31,
             // point.dist = distance_m;
             // point.value = moment_val;
 
-            // std::cout << "point.azimuth_deg: "<< point.azimuth_deg << std::endl;
-            // std::cout << "point.dist: "<< point.dist << std::endl;
-            // std::cout << "point.value:  "<< point.value << std::endl;
+            // //std::cout << "point.azimuth_deg: "<< point.azimuth_deg << std::endl;
+            // //std::cout << "point.dist: "<< point.dist << std::endl;
+            // //std::cout << "point.value:  "<< point.value << std::endl;
 
             if (distance_m > current_tilt.maxDist) current_tilt.maxDist = distance_m;
 
@@ -469,7 +491,7 @@ ArchiveIIMessageHeader parse_archive_ii_header(const uint8_t* p, bool first_mess
     hdr.seg_num           = read_be16(p);       p += 2;
 
 
-    // std::cout << "in the archive message header II parsing function \n \n \n" << std::endl;
+    // //std::cout << "in the archive message header II parsing function \n \n \n" << std::endl;
 
 
 
@@ -522,8 +544,8 @@ ArchiveIIMessageHeader parse_archive_ii_header(const uint8_t* p, bool first_mess
         ref_ptr_PHI =  msg31_ptr + msg31.block_pointer_8; 
         ref_ptr_RHO =  msg31_ptr + msg31.block_pointer_9; 
 
-        // std::cout <<" header size: " << hdr.size << std::endl;
-        // std::cout << "ref ptr ref: " << ref_ptr_REF << std::endl; 
+        // //std::cout <<" header size: " << hdr.size << std::endl;
+        // //std::cout << "ref ptr ref: " << ref_ptr_REF << std::endl; 
 
         if (msg31.block_pointer_4 != 0 && msg31.block_pointer_4 > 0 && msg31.block_pointer_4 < hdr.size *1.4) parse_one_moment(alltilts, ref_ptr_REF, msg31, msg31_ptr);
         if (msg31.block_pointer_5 != 0 && msg31.block_pointer_5 > 0 && msg31.block_pointer_5 < hdr.size *1.4) parse_one_moment(alltilts, ref_ptr_VEL, msg31, msg31_ptr);
@@ -576,7 +598,7 @@ void process_ldm_block(const std::vector<uint8_t>& decompressed, AllTilt& alltil
             message31_counter ++;
         }
         if (int(hdr.type) == 0 ){
-            std::cout << "header type is 0: " << int(hdr.type) << std::endl;
+            //std::cout << "header type is 0: " << int(hdr.type) << std::endl;
             break;
         }
         //size_t bytes_to_advance = hdr.size * 2+ 12;  // halfwords to bytes
@@ -600,17 +622,17 @@ void process_ldm_block(const std::vector<uint8_t>& decompressed, AllTilt& alltil
 #include <iomanip>  // for std::setprecision
 
 void printReflectivitySummary(const AllTilt& reflectivity_data) {
-    std::cout << "=== Reflectivity Data Summary ===\n";
-    std::cout << "Number of tilts: " << reflectivity_data.Tilts.size() << "\n\n";
+    //std::cout << "=== Reflectivity Data Summary ===\n";
+    //std::cout << "Number of tilts: " << reflectivity_data.Tilts.size() << "\n\n";
 
     for (size_t t = 0; t < reflectivity_data.Tilts.size(); ++t) {
         const SingleTilt& tilt = reflectivity_data.Tilts[t];
-        std::cout << "Tilt " << t << " | Elevation: " << std::fixed << std::setprecision(2)
-                  << tilt.ElevationAngle << " deg\n";
-        std::cout << "  Number of radials: " << tilt.Radials_REF.size() << "\n";
+        //std::cout << "Tilt " << t << " | Elevation: " << std::fixed << std::setprecision(2)
+                 // << tilt.ElevationAngle << " deg\n";
+        //std::cout << "  Number of radials: " << tilt.Radials_REF.size() << "\n";
 
         if (tilt.Radials_REF.empty()) {
-            std::cout << "  (No data)\n\n";
+            //std::cout << "  (No data)\n\n";
             continue;
         }
 
@@ -618,13 +640,13 @@ void printReflectivitySummary(const AllTilt& reflectivity_data) {
         size_t step = std::max((size_t)1, tilt.Radials_REF.size() / 25);
         // for (size_t i = 0; i < tilt.Radials_REF.size(); i += step) {
         //     const float& pt = tilt.Radials_REF[i];
-        //     std::cout << "    Azimuth: " << std::fixed << std::setprecision(2) << pt.azimuth_deg
+        //     //std::cout << "    Azimuth: " << std::fixed << std::setprecision(2) << pt.azimuth_deg
         //               << "°, Dist: " << pt.dist << " m, Value: " << pt.value << " dBZ\n";
         // }
-        // std::cout << "\n";
+        // //std::cout << "\n";
     }
 
-    std::cout << "=== End of Summary ===\n";
+    //std::cout << "=== End of Summary ===\n";
 }
 
 
@@ -645,7 +667,7 @@ void unzip_process_ldm_worker(size_t i, const size_t* bz2_offsets_array, const i
 
     const uint8_t* chunk_ptr = buffer.data() + start;
 
-    // std::cout << "Decompressing block " << i + 1
+    // //std::cout << "Decompressing block " << i + 1
     //         << " at offset " << start << ", max chunk: " << chunk_len << std::endl;
 
     std::vector<uint8_t> decompressed = decompress_bzip2_stream(chunk_ptr, chunk_len);
@@ -670,7 +692,7 @@ AllTilt combine_all_tilts_from_thread_results(std::vector<AllTilt>& thread_resul
         }
     }
 
-    std::cout << "Processing result with " << pre_combined.Tilts.size() << " tilts" << std::endl;
+    //std::cout << "Processing result with " << pre_combined.Tilts.size() << " tilts" << std::endl;
 
     auto append_radials = [](std::vector<float>& dst, const std::vector<float>& src) {
         dst.insert(dst.end(), src.begin(), src.end());
@@ -700,11 +722,11 @@ AllTilt combine_all_tilts_from_thread_results(std::vector<AllTilt>& thread_resul
         for (auto& combined_tilt : combined.Tilts) {
             if (std::fabs(tilt.ElevationAngle - combined_tilt.ElevationAngle) < 0.1f &&
                 std::llabs(static_cast<long long>(tilt.msg_31.collect_ms) - static_cast<long long>(combined_tilt.msg_31.collect_ms)) < 30000) {
-                std::cout << "Combining tilts" << std::endl;
-                std::cout << "tilt 1 elevation angle: " << combined_tilt.ElevationAngle << std::endl;
-                std::cout << "tilt 2 elevation angle: " << tilt.ElevationAngle << std::endl;
-                std::cout << "tilt 1 time: " << combined_tilt.msg_31.collect_ms << std::endl;
-                std::cout << "tilt 2 time: " << tilt.msg_31.collect_ms << std::endl;
+                //std::cout << "Combining tilts" << std::endl;
+                //std::cout << "tilt 1 elevation angle: " << combined_tilt.ElevationAngle << std::endl;
+                //std::cout << "tilt 2 elevation angle: " << tilt.ElevationAngle << std::endl;
+                //std::cout << "tilt 1 time: " << combined_tilt.msg_31.collect_ms << std::endl;
+                //std::cout << "tilt 2 time: " << tilt.msg_31.collect_ms << std::endl;
                 merge_tilt(combined_tilt, tilt);
                 merged = true;
                 break;
@@ -726,7 +748,7 @@ AllTilt combine_all_tilts_from_thread_results(std::vector<AllTilt>& thread_resul
     tilt_info.clear();
 
     for (auto& tilt : combined.Tilts) {
-        std::cout << "Combined tilt elevation angle: " << tilt.ElevationAngle << std::endl;
+        //std::cout << "Combined tilt elevation angle: " << tilt.ElevationAngle << std::endl;
 
         time_t timestamp = tilt.msg_31.collect_date * 86400 + tilt.msg_31.collect_ms / 1000;
 
@@ -735,10 +757,10 @@ AllTilt combine_all_tilts_from_thread_results(std::vector<AllTilt>& thread_resul
         char buffer[32];
         strftime(buffer, sizeof(buffer), "%Y-%m-%d %H-%M-%S", tm);
 
-        std::cout << buffer
-                << "." << std::setfill('0') << std::setw(3)
-                << (tilt.msg_31.collect_ms % 1000)
-                << std::endl;
+        //std::cout << buffer
+                // << "." << std::setfill('0') << std::setw(3)
+                // << (tilt.msg_31.collect_ms % 1000)
+                // << std::endl;
 
         tilt_info.push_back({tilt.ElevationAngle, std::string(buffer)});
 
@@ -752,6 +774,34 @@ AllTilt combine_all_tilts_from_thread_results(std::vector<AllTilt>& thread_resul
 
     return combined;
 }
+
+
+void set_voxel_dimensions(float latitude_topleft, float longitude_topleft, float latitude_bottomright, float longitude_bottomright) {
+    // calculate aspect ratio
+    bool latitude_range_larger = std::abs(latitude_bottomright - latitude_topleft) > std::abs(longitude_bottomright - longitude_topleft);
+    
+    if (latitude_range_larger) {
+        num_voxels_latitude = static_cast<int>(MAX_NUM_VOXELS_PER_SIDE);
+        num_voxels_longitude = static_cast<int>(MAX_NUM_VOXELS_PER_SIDE * (std::abs(longitude_bottomright - longitude_topleft)) / (std::abs(latitude_bottomright - latitude_topleft)));
+    } else {
+        num_voxels_latitude = static_cast<int>(MAX_NUM_VOXELS_PER_SIDE * (std::abs(latitude_bottomright - latitude_topleft)) / (std::abs(longitude_bottomright - longitude_topleft)));
+        num_voxels_longitude = static_cast<int>(MAX_NUM_VOXELS_PER_SIDE);
+    }
+
+    //make sure both are at least 1 or more
+    if (num_voxels_latitude < 1) {
+        num_voxels_latitude = 1;
+    }
+    if (num_voxels_longitude < 1) {
+        num_voxels_longitude = 1;
+    }
+
+    // always use max for height
+    num_voxels_height = MAX_NUM_VOXELS_PER_SIDE;
+
+}
+
+
 
 extern "C" {
 
@@ -905,8 +955,70 @@ extern "C" {
     }
 
     EMSCRIPTEN_KEEPALIVE
-    int get_interpolated_voxels_size() {
-        return num_voxels_per_side;
+    void set_latitude_topleft(float lat) {
+        latitude_topleft = lat;
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    void set_longitude_topleft(float lon) {
+        longitude_topleft = lon;
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    void set_latitude_bottomright(float lat) {
+        latitude_bottomright = lat;
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    void set_longitude_bottomright(float lon) {
+        longitude_bottomright = lon;
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    float get_latitude_topleft() {
+        return latitude_topleft;
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    float get_longitude_topleft() {
+        return longitude_topleft;
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    float get_latitude_bottomright() {
+        return latitude_bottomright;
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    float get_longitude_bottomright() {
+        return longitude_bottomright;
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    void set_max_num_voxels(int max_voxels) {
+
+        //make sure max_voxels is at least 1
+        if (max_voxels < 1) {
+            max_voxels = 1;
+        } else if (max_voxels > 500) {
+            max_voxels = 500;
+        }
+        MAX_NUM_VOXELS_PER_SIDE = max_voxels;
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    int get_interpolated_voxels_size_latitude() {
+        return num_voxels_latitude;
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    int get_interpolated_voxels_size_longitude() {
+        return num_voxels_longitude;
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    int get_interpolated_voxels_height() {
+        return num_voxels_height;
     }
     
     EMSCRIPTEN_KEEPALIVE
@@ -916,28 +1028,19 @@ extern "C" {
             return;
         }
 
-        interpolate_radar_data_to_voxels(
-            combined.Tilts[tilt_number_for_data].vol_el_rad.vol.lat + 1.0f,
-            combined.Tilts[tilt_number_for_data].vol_el_rad.vol.lon + 1.0f,
-            combined.Tilts[tilt_number_for_data].vol_el_rad.vol.lat - 1.0f,
-            combined.Tilts[tilt_number_for_data].vol_el_rad.vol.lon - 1.0f,
-            num_voxels_per_side
+        // set number voxels for lat, lng, height
+        set_voxel_dimensions(latitude_topleft, longitude_topleft, latitude_bottomright, longitude_bottomright);
+
+
+        interpolate_radar_data_to_voxels_new(
+            latitude_topleft,
+            longitude_topleft,
+            latitude_bottomright,
+            longitude_bottomright,
+            num_voxels_latitude,
+            num_voxels_longitude,
+            num_voxels_height
         );
-
-        using namespace std::chrono_literals; 
-        std::this_thread::sleep_for(2.5s);    // Sleep for 2.5 seconds
-
-        std::cout << "Sleep complete" << std::endl;
-
-
-        interpolate_radar_data_to_voxels(
-            combined.Tilts[tilt_number_for_data].vol_el_rad.vol.lat + 1.5f,
-            combined.Tilts[tilt_number_for_data].vol_el_rad.vol.lon + 1.5f,
-            combined.Tilts[tilt_number_for_data].vol_el_rad.vol.lat + 0.5f,
-            combined.Tilts[tilt_number_for_data].vol_el_rad.vol.lon + 0.5f,
-            num_voxels_per_side
-        );
-
 
         return;
 
@@ -952,15 +1055,21 @@ extern "C" {
         }
         return RadarVoxelVolume;
     }
+
+    EMSCRIPTEN_KEEPALIVE
+    void release_voxel_grid() {
+        delete[] RadarVoxelVolume;
+        RadarVoxelVolume = nullptr;
+    }
   
     EMSCRIPTEN_KEEPALIVE
     int parse_nexrad(uint8_t* data, int length) {
 
-        std::cout << "=== NEXRAD Level II Parser (AR2V Format) ===" << std::endl;
-        std::cout << "File length: " << length << std::endl;
+        //std::cout << "=== NEXRAD Level II Parser (AR2V Format) ===" << std::endl;
+        //std::cout << "File length: " << length << std::endl;
         
         if (length < 24) {
-            std::cout << "File too small" << std::endl;
+            //std::cout << "File too small" << std::endl;
             return -1;
         }
 
@@ -985,11 +1094,11 @@ extern "C" {
         std::memcpy(vol_header.icao, data_ptr, 4); data_ptr += 4;
 
 
-        std::cout << "Tape: '" << vol_header.tape << "'\n";
-        std::cout << "Extension: '" << vol_header.extension << "'\n";
-        std::cout << "Date: " << vol_header.date << "\n";
-        std::cout << "Time: " << vol_header.time << "\n";
-        std::cout << "ICAO: '" << vol_header.icao << "'\n";
+        //std::cout << "Tape: '" << vol_header.tape << "'\n";
+        //std::cout << "Extension: '" << vol_header.extension << "'\n";
+        //std::cout << "Date: " << vol_header.date << "\n";
+        //std::cout << "Time: " << vol_header.time << "\n";
+        //std::cout << "ICAO: '" << vol_header.icao << "'\n";
 
         //std::vector<uint8_t> buffer((std::istreambuf_iterator<char>(file)), {});
 
@@ -1007,7 +1116,7 @@ extern "C" {
         
 
         // std::copy(bz2_offsets.begin(), bz2_offsets.end(), std::ostream_iterator<int>(std::cout, " "));
-        // std::cout << "erm" << std::endl;
+        // //std::cout << "erm" << std::endl;
         // std::copy(bz2_block_sizes.begin(), bz2_block_sizes.end(), std::ostream_iterator<int>(std::cout, " "));
 
         for (size_t i = 0; i < bz2_offsets.size(); ++i) {
@@ -1031,11 +1140,11 @@ extern "C" {
 
         }
 
-        // std::cout << "Processed " << process_ldm_blocks_results.size() << " blocks" << std::endl;
+        // //std::cout << "Processed " << process_ldm_blocks_results.size() << " blocks" << std::endl;
         // for (auto& result : process_ldm_blocks_results) {
         //     // loop through tilts and print elevation angles
         //     for (auto& tilt: result.Tilts) {
-        //         std::cout << "Elevation angle: " << tilt.ElevationAngle << std::endl;
+        //         //std::cout << "Elevation angle: " << tilt.ElevationAngle << std::endl;
         //     }
         // }
 
@@ -1047,8 +1156,8 @@ extern "C" {
             //std::cout << "Processing tilt at elevation " << tilt.ElevationAngle << "\n";
             tilt_angles.push_back(tilt.ElevationAngle);
 
-            std::cout << "Tilt count: " << tilt.count << std::endl;
-            std::cout << "\n\n\n\n\n\n\n\n\n" << std::endl;
+            //std::cout << "Tilt count: " << tilt.count << std::endl;
+            //std::cout << "\n\n\n\n\n\n\n\n\n" << std::endl;
         }
 
 

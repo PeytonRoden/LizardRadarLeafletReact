@@ -114,7 +114,19 @@ EMCC_LDFLAGS := \
                           '_get_tilt_angles_size', \
                           '_populate_voxel_grid', \
                           '_get_voxel_grid', \
-                          '_get_interpolated_voxels_size', \
+                          '_release_voxel_grid', \
+                          '_set_latitude_topleft', \
+                          '_set_longitude_topleft', \
+                          '_set_latitude_bottomright', \
+                          '_set_longitude_bottomright', \
+                          '_get_latitude_topleft', \
+                          '_get_longitude_topleft', \
+                          '_get_latitude_bottomright', \
+                          '_get_longitude_bottomright', \
+                          '_set_max_num_voxels', \
+                          '_get_interpolated_voxels_size_latitude', \
+                          '_get_interpolated_voxels_size_longitude', \
+                          '_get_interpolated_voxels_height', \
                           '_malloc', \
                           '_free']" \
   -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap','HEAPU8','lengthBytesUTF8','stringToUTF8','HEAPF32']" \
