@@ -1,0 +1,16 @@
+; Moody differential phase table: violet low-end spinning up through teal, gold, and crimson
+Product: PHI
+Units: DEG
+Step: 10
+
+Color4: -1 0 0 0 0
+Color:   0  90   0 120
+Color:  20   0  60 160
+Color:  40   0 140 220
+Color:  60  60 220 160
+Color:  80 160 240  80
+Color: 100 255 230  60
+Color: 120 255 160   0
+Color: 140 230  80  30
+Color: 160 180  30 100
+Color: 180 120   0 120

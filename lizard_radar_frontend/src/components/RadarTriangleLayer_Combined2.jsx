@@ -5,32 +5,32 @@ import L from "leaflet";
 
 
 
-//layout will be, [dist1, az1, value1, dist2, az2, val2]
+//layout will be, [az1, dist1, value1, az2, dist2, val2]
 const PACKED_RADAR_DATA = new Float32Array([
-  100, 40.7228, 0.31,
-  110, 40.7428, 0.31,
-  105, 40.7028, 0.31,
-  60, 40.7128, 0.31,
-  70, 40.7228, 0.31,
-  80, 40.7628, 0.31,
-  100, 41.7228, 0.31,
-  110, 41.7428, 0.31,
-  105, 41.7028, 0.31,
-  60, 41.7128, 0.31,
-  70, 41.7228, 0.31,
-  80, 41.7628, 0.31,
-  100, 42.7228, 0.31,
-  110, 42.7428, 0.31,
-  105, 42.7028, 0.31,
-  60, 42.7128, 0.31,
-  70, 42.7228, 0.31,
-  80, 42.7628, 0.31,
-  100, 43.7228, 0.31,
-  110, 43.7428, 0.31,
-  105, 43.7028, 0.31,
-  60, 43.7128, 0.31,
-  70, 43.7228, 0.31,
-  80, 43.7628, 0.31,
+  40.7228, 100, 0.31,
+  40.7428, 110, 0.31,
+  40.7028, 105, 0.31,
+  40.7128, 60, 0.31,
+  40.7228, 70, 0.31,
+  40.7628, 80, 0.31,
+  41.7228, 100, 0.31,
+  41.7428, 110, 0.31,
+  41.7028, 105, 0.31,
+  41.7128, 60, 0.31,
+  41.7228, 70, 0.31,
+  41.7628, 80, 0.31,
+  42.7228, 100, 0.31,
+  42.7428, 110, 0.31,
+  42.7028, 105, 0.31,
+  42.7128, 60, 0.31,
+  42.7228, 70, 0.31,
+  42.7628, 80, 0.31,
+  43.7228, 100, 0.31,
+  43.7428, 110, 0.31,
+  43.7028, 105, 0.31,
+  43.7128, 60, 0.31,
+  43.7228, 70, 0.31,
+  43.7628, 80, 0.31,
 ]);
 
 const ELEVATION_ANGLE = 0.5
@@ -118,8 +118,8 @@ void main() {
     // Fetch the 3 floats for this specific bin
     vec3 binData = texelFetch(u_dataTexture, ivec2(texX, texY), 0).rgb;
     
-    float dist = binData.r;
-    float az = binData.g;
+    float az = binData.r;
+    float dist = binData.g;
     v_value = binData.b;
 
 
@@ -536,6 +536,10 @@ export default function RadarTriangleLayer({ data , elevation_angle, latitude_ce
 
     // 3 triangles drawn per call
     const totalBins = packed_radar_data.length / 3;
+    if (totalBins === 0) {
+      state.totalBins = 0;
+      return;
+    }
     const TEXTURE_WIDTH = state.textureWidth;
     const textureHeight = Math.max(1, Math.ceil(totalBins / TEXTURE_WIDTH));
 

@@ -220,6 +220,12 @@ export default function RadarSitesLayer({ onSelect, onRadarData, onPackedRadarDa
 
           handlers.onPackedRadarData?.(packedRadarData);
           hasRadarDataRef.current = true;
+
+          // TEMP DEBUG: memory trace instrumentation
+          // window.__nexradModule = module;
+          // console.log(
+          //   `[mem] ${radarLoadRequest.icao} jsHeap=${(performance.memory ? performance.memory.usedJSHeapSize / 1048576 : NaN).toFixed(1)}MB wasmHeap=${(module.HEAPU8.buffer.byteLength / 1048576).toFixed(1)}MB packed=${(packedRadarData.byteLength / 1048576).toFixed(1)}MB`
+          // );
         } finally {
           module._free(ptr);
         }
