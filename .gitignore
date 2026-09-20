@@ -1,0 +1,73 @@
+
+
+### Object Files:
+**/*.o
+
+### Ds store
+**/.DS_Store
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+
+# python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+*.egg
+*.egg-link
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+*.egg
+*.egg-link
+
+#env 
+cpp_wasm/build/pyart-env
+
+#testing 
+
+*test*
+
+
+#images, spreadsheets, csvs, movies, mp4s, 
+*.png
+*.csv
+*.mp4
+*.xlsx
+*.xls
+*.jpg
+*.jpeg
+
+# npy files
+*.npz
+*.npy
+
+
+# any radar files, usually end in v06
+*V06

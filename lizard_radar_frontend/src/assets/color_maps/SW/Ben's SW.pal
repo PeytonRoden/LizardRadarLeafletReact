@@ -1,0 +1,19 @@
+COLOR TABLE BY Los Capital Ben#9800
+
+Product: SW
+Units:   KTS
+Step:    2
+Scale:   1.9426     ; converts internal units (M/S) to KTS
+
+RF:  117 0 117
+
+color: 0 20 5 72
+color: 2 50 20 140
+color: 4 124 38 190
+color: 7 218 55 120
+color: 15 251 126 33
+color: 18 255 255 0
+color: 22 153 255 51
+color: 30 0 153 230
+color: 35 0 17 26
+color: 40 255 255 255

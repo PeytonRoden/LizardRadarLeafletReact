@@ -1,0 +1,22 @@
+; Classic differential reflectivity split:
+; negative (vertical/hail) = cool blues, positive (flat raindrops) = warm greens->reds
+Product: DR
+Units: DB
+Step: 1
+
+Color4: -9 0 0 0 0
+Color: -8  10  10  60
+Color: -6  20  20 140
+Color: -4  30  60 220
+Color: -2  60 140 255
+Color:  0 160 160 160
+Color:  1  34 139  34
+Color:  2  80 200  60
+Color:  3 180 220  40
+Color:  4 255 255   0
+Color:  5 255 190   0
+Color:  6 255 120   0
+Color:  7 220  30   0
+Color:  8 180   0  60
+Color:  9 200   0 160
+Color: 10 255 120 255
