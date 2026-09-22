@@ -2,18 +2,24 @@
 
 import MomentSelection from "./MomentSelection";
 import DataTimeSelection from "./DataTimeSelection";
-import TiltAngleSelection from "./TiltAngleSelection";
+import TiltAngleSelection, { formatTiltTime } from "./TiltAngleSelection";
 import ColorMapSelection from "./ColorMapSelection";
 
 import { useState } from "react";
 
 
 export default function SelectionsPanel({ selectedMoment, setSelectedMoment, selectedDataTime, setSelectedDataTime, selectedRadarSite, historicalSelection, setHistoricalSelection, onHistoricalLoad, radarLoadStatus, radarLoadError, radarSiteSelected, selectedTiltAngle, setSelectedTiltAngle, tiltAngles, tiltInfo, selectedColorMap, setSelectedColorMap, radarOpacity, setRadarOpacity, onOpenWasmImage }) {
-    const [collapsed, setCollapsed] = useState(false);
+    const [collapsed, setCollapsed] = useState(() => window.matchMedia("(max-width: 800px), (pointer: coarse)").matches);
     const [showAdvanced, setShowAdvanced] = useState(false);
 
+    const selectedTilt = tiltInfo?.find(({ angle }) => Math.abs(angle - selectedTiltAngle) < 0.0001);
+    const scanTime = selectedTilt?.time ? formatTiltTime(selectedTilt.time) : null;
+    const statusText = selectedRadarSite
+        ? `${selectedRadarSite.icao} · ${selectedMoment}${scanTime ? ` · ${scanTime.time} ${scanTime.date}` : ""}`
+        : null;
+
     return (
-        <div className={`selections-panel ${collapsed ? "selections-panel--collapsed" : ""}`}>
+        <div className={`selections-panel ${collapsed ? "selections-panel--collapsed" : ""} ${statusText ? "selections-panel--has-status" : ""}`}>
             <div className="selections-panel__header">
                 {/* <div className="selections-panel__title">Selections</div> */}
                 <div className="selections-panel__identity">
@@ -31,6 +37,7 @@ export default function SelectionsPanel({ selectedMoment, setSelectedMoment, sel
                         </svg>
                     </button>
                     <span className="selections-panel__title">Radar controls</span>
+                    {statusText && <span className="selections-panel__status">{statusText}</span>}
                 </div>
                 {!collapsed && (
                     <button

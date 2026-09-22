@@ -1,4 +1,5 @@
 import { useState } from "react";
+import LoadingSketch from "../LoadingSketch";
 import VolumeViewer from "./VolumeViewer";
 import { DEFAULT_INTERPOLATION_PARAMS } from "../../wasm/wasm_module_callers";
 
@@ -11,6 +12,8 @@ export default function VolumePane({ voxelData, status, error, bounds, selectedC
   const [isoValue, setIsoValue] = useState(0.15);
   const [rayStop, setRayStop] = useState(0.99);
   const [opacity, setOpacity] = useState(0.99);
+  const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
+  const maxVoxels = isCoarsePointer ? 128 : 256;
 
   return (
     <section className="volume-pane" aria-label="3D radar volume" aria-busy={status === "loading"}>
@@ -58,13 +61,13 @@ export default function VolumePane({ voxelData, status, error, bounds, selectedC
         {status === "idle" && <div className="volume-pane__message">Adjust the white rectangle, then press Go.</div>}
         {status === "loading" && (
           <div className="volume-pane__message volume-pane__message--loading" role="status" aria-live="polite">
-            <span className="volume-pane__spinner" aria-hidden="true" />
+            <LoadingSketch className="volume-pane__sketch" />
             <span>Building voxel grid…</span>
           </div>
         )}
         {status === "error" && <div className="volume-pane__message volume-pane__message--error">{error}</div>}
         {status === "success" && !voxelData && <div className="volume-pane__message">The voxel grid is empty.</div>}
-        <span className="volume-pane__hint">Drag to orbit · Scroll to zoom</span>
+        <span className="volume-pane__hint">{isCoarsePointer ? "Drag to orbit · Pinch to zoom" : "Drag to orbit · Scroll to zoom"}</span>
       </div>
 
       <div className="volume-controls">
@@ -95,7 +98,7 @@ export default function VolumePane({ voxelData, status, error, bounds, selectedC
           <summary>Advanced</summary>
           <label>
             <span>Grid density <output>{voxels} voxels/axis</output></span>
-            <input type="range" min="16" max="256" step="8" value={voxels} onChange={(event) => setVoxels(Number(event.target.value))} />
+            <input type="range" min="16" max={maxVoxels} step="8" value={Math.min(voxels, maxVoxels)} onChange={(event) => setVoxels(Number(event.target.value))} />
             {voxels >= 100 && (
               <span className="volume-controls__warning">
                 High density grids grow cubically — builds above ~100 can take a long time and use lots of memory.

@@ -6,7 +6,7 @@
 
 
 
-function formatTiltTime(utcTime) {
+export function formatTiltTime(utcTime) {
     const match = utcTime?.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2})-(\d{2})-(\d{2})$/);
     if (!match) return { date: "", time: utcTime || "Unknown time" };
 
@@ -42,7 +42,7 @@ export default function TiltAngleSelection({ selectedTiltAngle, setSelectedTiltA
             <select
                 value={selectedTiltAngle}
                 onChange={(e) => setSelectedTiltAngle(Number(e.target.value))}
-                className="selection-card__select selection-card__select--tilt"
+                className="selection-card__select"
             >
                 {options.map(({ angle, time }) => {
                     const timestamp = time ? formatTiltTime(time) : null;

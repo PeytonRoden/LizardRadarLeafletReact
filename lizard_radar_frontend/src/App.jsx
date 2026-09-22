@@ -39,6 +39,7 @@ export default function App() {
   const [showWasmImagePopup, setShowWasmImagePopup] = useState(false);
   const [show3D, setShow3D] = useState(false);
   const [splitOrientation, setSplitOrientation] = useState(() => window.matchMedia("(max-aspect-ratio: 4 / 5)").matches ? "vertical" : "horizontal");
+  const [isNarrowScreen, setIsNarrowScreen] = useState(() => window.matchMedia("(max-width: 800px)").matches);
   const [splitRatio, setSplitRatio] = useState(50);
   const [isResizingSplit, setIsResizingSplit] = useState(false);
   const splitOrientationChangedRef = useRef(false);
@@ -156,24 +157,38 @@ export default function App() {
 
   useEffect(() => {
     const phoneAspectRatio = window.matchMedia("(max-aspect-ratio: 4 / 5)");
+    const narrowScreen = window.matchMedia("(max-width: 800px)");
     const updateDefaultOrientation = (event) => {
       if (!splitOrientationChangedRef.current) setSplitOrientation(event.matches ? "vertical" : "horizontal");
     };
+    const updateNarrowScreen = (event) => setIsNarrowScreen(event.matches);
 
     phoneAspectRatio.addEventListener("change", updateDefaultOrientation);
-    return () => phoneAspectRatio.removeEventListener("change", updateDefaultOrientation);
+    narrowScreen.addEventListener("change", updateNarrowScreen);
+    return () => {
+      phoneAspectRatio.removeEventListener("change", updateDefaultOrientation);
+      narrowScreen.removeEventListener("change", updateNarrowScreen);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!show3D) return;
+    const img = new Image();
+    img.src = "/loading-sketch.gif";
+  }, [show3D]);
 
   const changeSplitOrientation = (orientation) => {
     splitOrientationChangedRef.current = true;
     setSplitOrientation(orientation);
   };
 
+  const effectiveSplitOrientation = isNarrowScreen ? "vertical" : splitOrientation;
+
   const resizeSplit = (clientX, clientY) => {
     const bounds = viewerSplitRef.current?.getBoundingClientRect();
     if (!bounds) return;
-    const position = splitOrientation === "horizontal" ? clientX - bounds.left : clientY - bounds.top;
-    const size = splitOrientation === "horizontal" ? bounds.width : bounds.height;
+    const position = effectiveSplitOrientation === "horizontal" ? clientX - bounds.left : clientY - bounds.top;
+    const size = effectiveSplitOrientation === "horizontal" ? bounds.width : bounds.height;
     setSplitRatio(Math.min(80, Math.max(20, position / size * 100)));
   };
 
@@ -193,25 +208,23 @@ export default function App() {
   };
 
   const handleDividerKeyDown = (event) => {
-    const decreaseKeys = splitOrientation === "horizontal" ? ["ArrowLeft"] : ["ArrowUp"];
-    const increaseKeys = splitOrientation === "horizontal" ? ["ArrowRight"] : ["ArrowDown"];
+    const decreaseKeys = effectiveSplitOrientation === "horizontal" ? ["ArrowLeft"] : ["ArrowUp"];
+    const increaseKeys = effectiveSplitOrientation === "horizontal" ? ["ArrowRight"] : ["ArrowDown"];
     if (!decreaseKeys.includes(event.key) && !increaseKeys.includes(event.key)) return;
     event.preventDefault();
     setSplitRatio((ratio) => Math.min(80, Math.max(20, ratio + (increaseKeys.includes(event.key) ? 2 : -2))));
   };
 
 
-  const loadingLabel = voxelStatus === "loading"
-    ? "Building 3D volume…"
-    : radarLoadStatus === "parsing"
-      ? "Processing radar data…"
-      : "Downloading radar data…";
-  const isLoading = voxelStatus === "loading" || ["downloading", "parsing"].includes(radarLoadStatus);
+  const loadingLabel = radarLoadStatus === "parsing"
+    ? "Processing radar data…"
+    : "Downloading radar data…";
+  const isLoading = ["downloading", "parsing"].includes(radarLoadStatus);
 
   return  <div className="app-layout">
     <div
       ref={viewerSplitRef}
-      className={`viewer-split viewer-split--${splitOrientation} ${show3D ? "viewer-split--open" : ""} ${isResizingSplit ? "viewer-split--resizing" : ""}`}
+      className={`viewer-split viewer-split--${effectiveSplitOrientation} ${show3D ? "viewer-split--open" : ""} ${isResizingSplit ? "viewer-split--resizing" : ""}`}
       style={{ "--map-pane-size": `${splitRatio}%` }}
     >
       <div className="map-pane">
@@ -263,7 +276,7 @@ export default function App() {
             role="separator"
             tabIndex={0}
             aria-label="Resize map and 3D panes"
-            aria-orientation={splitOrientation === "horizontal" ? "vertical" : "horizontal"}
+            aria-orientation={effectiveSplitOrientation === "horizontal" ? "vertical" : "horizontal"}
             aria-valuemin={20}
             aria-valuemax={80}
             aria-valuenow={Math.round(splitRatio)}
@@ -282,7 +295,7 @@ export default function App() {
             bounds={voxelBounds}
             selectedColorMap={selectedColorMap}
             selectedMoment={selectedMoment}
-            splitOrientation={splitOrientation}
+            splitOrientation={effectiveSplitOrientation}
             onSplitOrientationChange={changeSplitOrientation}
             onGenerate={generateVoxelVolume}
             interpolationParams={interpolationParams}
