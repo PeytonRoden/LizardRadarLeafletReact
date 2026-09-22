@@ -27,11 +27,24 @@ export function formatTiltTime(utcTime) {
     };
 }
 
-export default function TiltAngleSelection({ selectedTiltAngle, setSelectedTiltAngle, tiltAngles, tiltInfo = [] }) {
+export default function TiltAngleSelection({ selectedTiltIndex, setSelectedTiltIndex, tiltAngles, tiltInfo = [] }) {
     const options = tiltInfo.length > 0
         ? tiltInfo
         : tiltAngles.map((angle) => ({ angle, time: null }));
-    const selectedInfo = options.find(({ angle }) => Math.abs(angle - selectedTiltAngle) < 0.0001);
+    // Sort display order by scan time, but keep the original index as the
+    // option value since selectedTiltIndex maps to the WASM tilt index.
+    const sortedOptions = options
+        .map((option, index) => ({ option, index }))
+        .sort((a, b) => {
+            if (a.option.time && b.option.time) return a.option.time < b.option.time ? -1 : a.option.time > b.option.time ? 1 : 0;
+            if (a.option.time) return -1;
+            if (b.option.time) return 1;
+            return a.index - b.index;
+        });
+    const selectedIndex = options.length > 0
+        ? Math.min(Math.max(selectedTiltIndex, 0), options.length - 1)
+        : 0;
+    const selectedInfo = options[selectedIndex];
     const selectedTime = selectedInfo?.time ? formatTiltTime(selectedInfo.time) : null;
 
     return (
@@ -40,15 +53,15 @@ export default function TiltAngleSelection({ selectedTiltAngle, setSelectedTiltA
                 Tilt angle
             </div>
             <select
-                value={selectedTiltAngle}
-                onChange={(e) => setSelectedTiltAngle(Number(e.target.value))}
+                value={selectedIndex}
+                onChange={(e) => setSelectedTiltIndex(Number(e.target.value))}
                 className="selection-card__select"
             >
-                {options.map(({ angle, time }) => {
+                {sortedOptions.map(({ option: { angle, time }, index }) => {
                     const timestamp = time ? formatTiltTime(time) : null;
 
                     return (
-                        <option key={angle} value={angle}>
+                        <option key={`${angle}-${time}-${index}`} value={index}>
                             {angle.toFixed(4)}°{timestamp ? ` — ${timestamp.time} · ${timestamp.date}` : ""}
                         </option>
                     );

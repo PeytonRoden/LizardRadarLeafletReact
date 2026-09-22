@@ -123,13 +123,13 @@ async function fetchHistoricalRadar({ icao, year, month, day, time }, signal) {
   return downloadNexrad(url, signal);
 }
 
-export default function RadarSitesLayer({ onSelect, onRadarData, onPackedRadarData, onCurrentDataTiltAngle, onCurrentRadarStationLatitude, onCurrentRadarStationLongitude, onTiltAngles, onTiltInfo, onRadarLoadState, ensureWasmLoaded, selectedMoment, selectedTiltAngle, radarLoadRequest })  {
+export default function RadarSitesLayer({ onSelect, onRadarData, onPackedRadarData, onCurrentDataTiltAngle, onCurrentRadarStationLatitude, onCurrentRadarStationLongitude, onTiltAngles, onTiltInfo, onRadarLoadState, ensureWasmLoaded, selectedMoment, selectedTiltIndex, radarLoadRequest })  {
   const moduleRef = useRef(null);
   const hasRadarDataRef = useRef(false);
   const handlersRef = useRef({});
-  const selectionRef = useRef({ selectedMoment, selectedTiltAngle });
+  const selectionRef = useRef({ selectedMoment, selectedTiltIndex });
   handlersRef.current = { onRadarData, onPackedRadarData, onCurrentDataTiltAngle, onCurrentRadarStationLatitude, onCurrentRadarStationLongitude, onTiltAngles, onTiltInfo, onRadarLoadState };
-  selectionRef.current = { selectedMoment, selectedTiltAngle };
+  selectionRef.current = { selectedMoment, selectedTiltIndex };
 
   function setWasmMoment(module, moment) {
     if (!module._set_selected_radar_moment || !module.lengthBytesUTF8 || !module.stringToUTF8) {
@@ -146,17 +146,12 @@ export default function RadarSitesLayer({ onSelect, onRadarData, onPackedRadarDa
     }
   }
 
-  function refreshSelectedRadarData(module, moment, tiltAngle) {
+  function refreshSelectedRadarData(module, moment, tiltIndex) {
     setWasmMoment(module, moment);
 
     const tiltCount = module._get_tilt_count?.() ?? 0;
-    let tiltIndex = 0;
-    for (let index = 0; index < tiltCount; index += 1) {
-      if (Math.abs(module._get_tilt_angle(index) - tiltAngle) < Math.abs(module._get_tilt_angle(tiltIndex) - tiltAngle)) {
-        tiltIndex = index;
-      }
-    }
-    module._set_tilt_index?.(tiltIndex);
+    const clampedTiltIndex = tiltCount > 0 ? Math.min(Math.max(tiltIndex, 0), tiltCount - 1) : 0;
+    module._set_tilt_index?.(clampedTiltIndex);
 
     const packedRadarData = readPackedRadarData(module);
     onPackedRadarData?.(packedRadarData);
@@ -167,9 +162,9 @@ export default function RadarSitesLayer({ onSelect, onRadarData, onPackedRadarDa
 
   useEffect(() => {
     if (hasRadarDataRef.current && moduleRef.current) {
-      refreshSelectedRadarData(moduleRef.current, selectedMoment, selectedTiltAngle);
+      refreshSelectedRadarData(moduleRef.current, selectedMoment, selectedTiltIndex);
     }
-  }, [selectedMoment, selectedTiltAngle]);
+  }, [selectedMoment, selectedTiltIndex]);
 
   useEffect(() => {
     if (!radarLoadRequest) return;

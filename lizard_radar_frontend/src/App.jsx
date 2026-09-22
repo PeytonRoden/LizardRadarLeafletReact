@@ -30,7 +30,7 @@ export default function App() {
   const [radarLoadRequest, setRadarLoadRequest] = useState(null);
   const [radarLoadStatus, setRadarLoadStatus] = useState("idle");
   const [radarLoadError, setRadarLoadError] = useState("");
-  const [selectedTiltAngle, setSelectedTiltAngle] = useState(0.0);
+  const [selectedTiltIndex, setSelectedTiltIndex] = useState(0);
   const [tiltAngles, setTiltAngles] = useState([]);
   const [tiltInfo, setTiltInfo] = useState([]);
   const [selectedColorMap, setSelectedColorMap] = useState("REF/Base Reflectivity");
@@ -231,7 +231,7 @@ export default function App() {
         <MapView
           ensureWasmLoaded={ensureWasmLoaded}
           selectedMoment={selectedMoment}
-          selectedTiltAngle={selectedTiltAngle}
+          selectedTiltIndex={selectedTiltIndex}
           selectedColorMap={selectedColorMap}
           radarOpacity={radarOpacity}
           radarLoadRequest={radarLoadRequest}
@@ -244,7 +244,7 @@ export default function App() {
           onRadarLongitudeChange={handleRadarLongitudeChange}
           onTiltAngles={(angles) => {
             setTiltAngles(angles);
-            if (angles.length > 0) setSelectedTiltAngle(angles[0]);
+            if (angles.length > 0) setSelectedTiltIndex(0);
           }}
           onTiltInfo={setTiltInfo}
         />
@@ -252,7 +252,7 @@ export default function App() {
           <ShaderPlane />
         </div> */}
         <div className="overlay-panel">
-          <SelectionsPanel selectedMoment={selectedMoment} setSelectedMoment={setSelectedMoment} selectedDataTime={selectedDataTime} setSelectedDataTime={handleDataTimeChange} selectedRadarSite={selectedRadarSite} historicalSelection={historicalSelection} setHistoricalSelection={setHistoricalSelection} onHistoricalLoad={handleHistoricalLoad} radarLoadStatus={radarLoadStatus} radarLoadError={radarLoadError} selectedTiltAngle={selectedTiltAngle} setSelectedTiltAngle={setSelectedTiltAngle} radarSiteSelected={radarSiteSelected} setRadarSiteSelected={setRadarSiteSelected} tiltAngles={tiltAngles} selectedColorMap={selectedColorMap} setSelectedColorMap={setSelectedColorMap} radarOpacity={radarOpacity} setRadarOpacity={setRadarOpacity} tiltInfo={tiltInfo} onOpenWasmImage={() => setShowWasmImagePopup(true)} />
+          <SelectionsPanel selectedMoment={selectedMoment} setSelectedMoment={setSelectedMoment} selectedDataTime={selectedDataTime} setSelectedDataTime={handleDataTimeChange} selectedRadarSite={selectedRadarSite} historicalSelection={historicalSelection} setHistoricalSelection={setHistoricalSelection} onHistoricalLoad={handleHistoricalLoad} radarLoadStatus={radarLoadStatus} radarLoadError={radarLoadError} selectedTiltIndex={selectedTiltIndex} setSelectedTiltIndex={setSelectedTiltIndex} radarSiteSelected={radarSiteSelected} setRadarSiteSelected={setRadarSiteSelected} tiltAngles={tiltAngles} selectedColorMap={selectedColorMap} setSelectedColorMap={setSelectedColorMap} radarOpacity={radarOpacity} setRadarOpacity={setRadarOpacity} tiltInfo={tiltInfo} onOpenWasmImage={() => setShowWasmImagePopup(true)} />
           {!show3D && <ThreeDButton onOpen={() => setShow3D(true)} />}
         </div>
         {showWasmImagePopup && (

@@ -197,6 +197,7 @@ struct VelocityRay {
 
 struct SingleTilt {
     float ElevationAngle = 0.0f;               // Nominal tilt angle
+    int ElevationNumber = -1;                   // Elevation number
     int count = 0;
     float maxDist = 0;  //maximum distance in m of this tilt.
     float gateSpacing = 250.0f;

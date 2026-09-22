@@ -2,6 +2,9 @@
 #include "nexrad_image_builder.h"
 #include "voxel_interpolation.h"
 #include "velocity_dealias.h"
+#include "velocity_dealias_v2.h"
+#include "velocity_dealias_v3.h"
+
 #include "structs_and_constants.h"
 #include <iostream>
 #include <ctime>
@@ -371,12 +374,14 @@ float read_radial_nyquist_ms(const uint8_t* msg31_ptr, uint32_t block_pointer_3)
     return read_be16s(p + 16) / 100.0f;
 }
 
-void parse_one_moment(AllTilt& alltilts, const uint8_t* ref_ptr , MSG_31& msg31, const uint8_t* msg31_ptr){
+void parse_one_moment(AllTilt& alltilts, const uint8_t* ref_ptr , MSG_31& msg31, const uint8_t* msg31_ptr, std::string moment_name){
 
 
         GENERIC_DATA_BLOCK MOMENT;
         MOMENT.block_type = *ref_ptr++;
         std::memcpy(MOMENT.data_name, ref_ptr, 3); ref_ptr += 3;
+
+
         // Read the remaining fields using big-endian readers:
         MOMENT.reserved = read_be32(ref_ptr); ref_ptr += 4;
         MOMENT.gate_count = read_be16(ref_ptr); ref_ptr += 2;
@@ -392,7 +397,11 @@ void parse_one_moment(AllTilt& alltilts, const uint8_t* ref_ptr , MSG_31& msg31,
 
         char moment_buf[4];                    // one extra for '\0'
         std::memcpy(moment_buf, MOMENT.data_name, 3);
-        moment_buf[3] = '\0';    
+        moment_buf[3] = '\0';   
+        
+        // if (std::string(moment_buf) != moment_name) {
+        //     return;
+        // }
 
 
         const uint8_t* data_ptr = ref_ptr;
@@ -404,6 +413,7 @@ void parse_one_moment(AllTilt& alltilts, const uint8_t* ref_ptr , MSG_31& msg31,
 
             SingleTilt tilt_0;
             tilt_0.ElevationAngle = msg31.elevation_angle;
+            tilt_0.ElevationNumber = msg31.elevation_number;
 
             VOL_EL_RAD vol_el_rad = parse_vol_el_rad_blocks(msg31_ptr + msg31.block_pointer_1, msg31_ptr + msg31.block_pointer_2,msg31_ptr + msg31.block_pointer_3 );
             tilt_0.vol_el_rad = vol_el_rad    ;
@@ -414,10 +424,12 @@ void parse_one_moment(AllTilt& alltilts, const uint8_t* ref_ptr , MSG_31& msg31,
             // Check if we are at the same tilt or a different tilt
             SingleTilt& last = alltilts.Tilts.back();
 
-            if (std::abs(last.ElevationAngle - msg31.elevation_angle) >= 0.3f) {
+            // if (std::abs(last.ElevationAngle - msg31.elevation_angle) >= 0.3f) {
+            if (last.ElevationNumber != msg31.elevation_number) {
                 // New tilt
                 SingleTilt tilt_next;
                 tilt_next.ElevationAngle = msg31.elevation_angle;
+                tilt_next.ElevationNumber = msg31.elevation_number;
                 VOL_EL_RAD vol_el_rad = parse_vol_el_rad_blocks(msg31_ptr + msg31.block_pointer_1,msg31_ptr + msg31.block_pointer_2,msg31_ptr + msg31.block_pointer_3 );
                 tilt_next.vol_el_rad = vol_el_rad    ;
                 tilt_next.gateSpacing = MOMENT.gate_spacing;
@@ -526,6 +538,10 @@ ArchiveIIMessageHeader parse_archive_ii_header(const uint8_t* p, bool first_mess
 
 
     if (int(hdr.type) == 31 ){
+
+        const size_t msg31_size = static_cast<size_t>(hdr.size) * 2 - 4;
+
+
         ////parse out message 31s
         const uint8_t* msg31_ptr = p; // Start of the Message 31 (after ArchiveIIMessageHeader)
         
@@ -577,12 +593,13 @@ ArchiveIIMessageHeader parse_archive_ii_header(const uint8_t* p, bool first_mess
         // //std::cout <<" header size: " << hdr.size << std::endl;
         // //std::cout << "ref ptr ref: " << ref_ptr_REF << std::endl; 
 
-        if (msg31.block_pointer_4 != 0 && msg31.block_pointer_4 > 0 && msg31.block_pointer_4 < hdr.size *1.4) parse_one_moment(alltilts, ref_ptr_REF, msg31, msg31_ptr);
-        if (msg31.block_pointer_5 != 0 && msg31.block_pointer_5 > 0 && msg31.block_pointer_5 < hdr.size *1.4) parse_one_moment(alltilts, ref_ptr_VEL, msg31, msg31_ptr);
-        if (msg31.block_pointer_6 != 0 && msg31.block_pointer_6 > 0 && msg31.block_pointer_6 < hdr.size *1.4) parse_one_moment(alltilts, ref_ptr_SW, msg31, msg31_ptr);
-        if (msg31.block_pointer_7 != 0 && msg31.block_pointer_7 > 0 && msg31.block_pointer_7 < hdr.size *1.4) parse_one_moment(alltilts, ref_ptr_ZDR, msg31, msg31_ptr);
-        if (msg31.block_pointer_8 != 0 && msg31.block_pointer_8 > 0 && msg31.block_pointer_8 < hdr.size *1.4) parse_one_moment(alltilts, ref_ptr_PHI, msg31, msg31_ptr);
-        if (msg31.block_pointer_9 != 0 && msg31.block_pointer_9 > 0 && msg31.block_pointer_9 < hdr.size *1.4) parse_one_moment(alltilts, ref_ptr_RHO, msg31, msg31_ptr);
+        if (msg31.block_pointer_4 > 0 && msg31.block_pointer_4 < msg31_size) parse_one_moment(alltilts, ref_ptr_REF, msg31, msg31_ptr, "REF");
+        if (msg31.block_pointer_5 > 0 && msg31.block_pointer_5 < msg31_size) parse_one_moment(alltilts, ref_ptr_VEL, msg31, msg31_ptr, "VEL");
+        if (msg31.block_pointer_6 > 0 && msg31.block_pointer_6 < msg31_size) parse_one_moment(alltilts, ref_ptr_SW, msg31, msg31_ptr, "SW");
+        if (msg31.block_pointer_7 > 0 && msg31.block_pointer_7 < msg31_size) parse_one_moment(alltilts, ref_ptr_ZDR, msg31, msg31_ptr, "ZDR");
+        if (msg31.block_pointer_8 > 0 && msg31.block_pointer_8 < msg31_size) parse_one_moment(alltilts, ref_ptr_PHI, msg31, msg31_ptr, "PHI");
+        if (msg31.block_pointer_9 > 0 && msg31.block_pointer_9 < msg31_size) parse_one_moment(alltilts, ref_ptr_RHO, msg31, msg31_ptr, "RHO");
+
         // if (msg31.block_pointer_4 != 0 && msg31.block_pointer_4 > 0) parse_one_moment(alltilts, ref_ptr_REF, msg31, msg31_ptr);
         // if (msg31.block_pointer_5 != 0 && msg31.block_pointer_5 > 0) parse_one_moment(alltilts, ref_ptr_VEL, msg31, msg31_ptr);
         // if (msg31.block_pointer_6 != 0 && msg31.block_pointer_6 > 0) parse_one_moment(alltilts, ref_ptr_SW, msg31, msg31_ptr);
@@ -757,8 +774,9 @@ AllTilt combine_all_tilts_from_thread_results(std::vector<AllTilt>& thread_resul
         bool merged = false;
 
         for (auto& combined_tilt : combined.Tilts) {
-            if (std::fabs(tilt.ElevationAngle - combined_tilt.ElevationAngle) < 0.1f &&
-                std::llabs(static_cast<long long>(tilt.msg_31.collect_ms) - static_cast<long long>(combined_tilt.msg_31.collect_ms)) < 30000) {
+            // if (std::fabs(tilt.ElevationAngle - combined_tilt.ElevationAngle) < 0.1f &&
+            //     std::llabs(static_cast<long long>(tilt.msg_31.collect_ms) - static_cast<long long>(combined_tilt.msg_31.collect_ms)) < 30000) {
+            if (tilt.ElevationNumber == combined_tilt.ElevationNumber) {
                 //std::cout << "Combining tilts" << std::endl;
                 //std::cout << "tilt 1 elevation angle: " << combined_tilt.ElevationAngle << std::endl;
                 //std::cout << "tilt 2 elevation angle: " << tilt.ElevationAngle << std::endl;
@@ -1241,7 +1259,7 @@ extern "C" {
         // }
 
         combined = combine_all_tilts_from_thread_results(process_ldm_blocks_results);
-        dealias_velocity_volume(combined);
+        dealias_velocity_volume_v3(combined);
         tilt_number_for_data = 0;
 
         for (auto& tilt : combined.Tilts) {

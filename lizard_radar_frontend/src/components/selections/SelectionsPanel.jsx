@@ -8,11 +8,11 @@ import ColorMapSelection from "./ColorMapSelection";
 import { useState } from "react";
 
 
-export default function SelectionsPanel({ selectedMoment, setSelectedMoment, selectedDataTime, setSelectedDataTime, selectedRadarSite, historicalSelection, setHistoricalSelection, onHistoricalLoad, radarLoadStatus, radarLoadError, radarSiteSelected, selectedTiltAngle, setSelectedTiltAngle, tiltAngles, tiltInfo, selectedColorMap, setSelectedColorMap, radarOpacity, setRadarOpacity, onOpenWasmImage }) {
+export default function SelectionsPanel({ selectedMoment, setSelectedMoment, selectedDataTime, setSelectedDataTime, selectedRadarSite, historicalSelection, setHistoricalSelection, onHistoricalLoad, radarLoadStatus, radarLoadError, radarSiteSelected, selectedTiltIndex, setSelectedTiltIndex, tiltAngles, tiltInfo, selectedColorMap, setSelectedColorMap, radarOpacity, setRadarOpacity, onOpenWasmImage }) {
     const [collapsed, setCollapsed] = useState(() => window.matchMedia("(max-width: 800px), (pointer: coarse)").matches);
     const [showAdvanced, setShowAdvanced] = useState(false);
 
-    const selectedTilt = tiltInfo?.find(({ angle }) => Math.abs(angle - selectedTiltAngle) < 0.0001);
+    const selectedTilt = tiltInfo?.[selectedTiltIndex];
     const scanTime = selectedTilt?.time ? formatTiltTime(selectedTilt.time) : null;
     const statusText = selectedRadarSite
         ? `${selectedRadarSite.icao} · ${selectedMoment}${scanTime ? ` · ${scanTime.time} ${scanTime.date}` : ""}`
@@ -58,7 +58,7 @@ export default function SelectionsPanel({ selectedMoment, setSelectedMoment, sel
 
                     {/* Some Selections ONLY appear after a radar site is selected, We will pass variable called "radarSiteSelected" to control this */}
                     {radarSiteSelected && (
-                        <TiltAngleSelection selectedTiltAngle={selectedTiltAngle} setSelectedTiltAngle={setSelectedTiltAngle} tiltAngles={tiltAngles} tiltInfo={tiltInfo} />
+                        <TiltAngleSelection selectedTiltIndex={selectedTiltIndex} setSelectedTiltIndex={setSelectedTiltIndex} tiltAngles={tiltAngles} tiltInfo={tiltInfo} />
                     )}
                     {radarSiteSelected && (
                         <ColorMapSelection selectedMoment={selectedMoment} selectedColorMap={selectedColorMap} setSelectedColorMap={setSelectedColorMap} />
