@@ -228,12 +228,21 @@ void dealias_tilt(SingleTilt& tilt)
         ++region.version;
         std::array<int, 7> votes{};
         std::array<std::vector<int>, 7> source_gates, target_gates;
+        std::vector<float> references;
+        for (const auto& edge : region.boundary) {
+            if (claimed[edge.neighbor]) references.push_back(boundary_reference(edge.gate, edge.neighbor));
+        }
+        if (references.empty()) return;
+        std::sort(references.begin(), references.end());
+        const float texture = references[3 * (references.size() - 1) / 4] - references[(references.size() - 1) / 4];
         int total = 0;
         for (const auto& edge : region.boundary) {
             if (!claimed[edge.neighbor]) continue;
             const float reference = boundary_reference(edge.gate, edge.neighbor);
             const float corrected = dealias_to_reference(grid[edge.gate], reference, region.nyquist);
-            if (!std::isfinite(corrected) || std::fabs(corrected - reference) > 0.3f * std::min(region.nyquist, nyq[edge.neighbor])) continue;
+            const float edge_nyquist = std::min(region.nyquist, nyq[edge.neighbor]);
+            const float tolerance = std::min(edge_nyquist, 0.3f * edge_nyquist + texture);
+            if (!std::isfinite(corrected) || std::fabs(corrected - reference) > tolerance) continue;
             ++total;
             const int fold = static_cast<int>(std::lround((corrected - grid[edge.gate]) / (2.0f * region.nyquist)));
             const int bin = fold + 3;
