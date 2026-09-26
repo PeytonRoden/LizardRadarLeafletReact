@@ -9,340 +9,941 @@
 #include <queue>
 #include <vector>
 
-// ---------------------------------------------------------------------------
-// Region-based velocity dealiasing, resolved by best-first (quality-guided)
-// propagation across region boundaries.
-//
-// Doppler dealiasing is mathematically the same problem as 2*pi phase
-// unwrapping, and the resolution strategy below borrows from that
-// literature's "quality-guided path following" family (Goldstein-style
-// branch cuts, Flynn minimum-discontinuity unwrapping): fold every region as
-// soon as *any* already-resolved neighbor gives evidence for it, and use the
-// amount of evidence only to decide processing *order*, never eligibility.
-//
-// The previous implementation required >=3 votes and >=3 distinct
-// already-resolved boundary gates before a region could be folded at all.
-// A tornadic couplet core is frequently only 1-4 gates across and 1-3 rays
-// wide, so it routinely could not reach that quorum -- it fell through to
-// the "unresolved island, fold = 0" fallback and was left aliased even
-// though the field immediately around it dealiased correctly. This version
-// removes the quorum: a region with one confident neighbor gets folded from
-// that one neighbor, just later (lower priority) than a region with many.
-// ---------------------------------------------------------------------------
-
 namespace {
 
-constexpr float VELOCITY_NAN = std::numeric_limits<float>::quiet_NaN();
-constexpr int   MAX_FOLDS = 4;       // largest plausible jump, in Nyquist intervals (tune per radar)
-constexpr float AZ_EPS = 0.01f;
-constexpr float SEG_FRAC = 0.18f;    // intra-region continuity threshold, fraction of Nyquist
-constexpr int   REPAIR_PASSES = 3;   // bounded local-consistency relaxation
+// ============================================================================
+// Velocity Dealiasing v3
+//
+// Design:
+//   - Keeps v2's aggressive best-first region propagation.
+//   - NO confidence veto: evidence always produces a propagation candidate.
+//   - Candidate folds are scored using the entire resolved boundary.
+//   - Robust Huber-like boundary cost prevents one bad edge dominating.
+//   - Candidate margin is metadata / queue priority only.
+//   - No global min-|V| anchoring.
+//   - No high-shear / TVS veto.
+//   - Vertical information is intentionally not hard-wired here; v3 focuses
+//     on making the 2-D single-tilt inference reliable first.
+//
+// The fundamental model is:
+//     observed_velocity = true_velocity modulo 2 * Nyquist
+//
+// A region is internally continuous, so it receives one integer fold.
+// ============================================================================
 
-inline int fold_estimate(float raw, float reference, float nyquist)
+constexpr float VEL_NAN = std::numeric_limits<float>::quiet_NaN();
+
+constexpr float AZ_EPS = 0.01f;
+constexpr float NYQ_REL_TOL = 0.03f;
+
+// Initial segmentation threshold. This is deliberately less aggressive than
+// v2's 0.20 Nyquist split. It can be tuned after looking at real scans.
+constexpr float SEG_FRAC = 0.40f;
+
+// Neighbor range matching.
+constexpr float RANGE_TOL = 0.10f;
+
+// Candidate fold search. NEXRAD tornado cases can require several folds.
+constexpr int MAX_FOLDS = 6;
+
+// Robust boundary loss. Residuals below this fraction of Nyquist are treated
+// approximately quadratically; large residuals become approximately linear.
+constexpr float HUBER_FRAC = 0.50f;
+
+// A boundary edge whose Nyquist is incompatible with the region is ignored.
+inline bool valid_nyq(float n)
 {
-    return static_cast<int>(std::lround((reference - raw) / (2.0f * nyquist)));
+    return std::isfinite(n) && n > 0.0f;
 }
 
-struct Boundary { int gate; int neighbor; };
+inline bool compatible_nyq(float a, float b)
+{
+    if (!valid_nyq(a) || !valid_nyq(b))
+        return false;
+
+    return std::fabs(a - b) <=
+           NYQ_REL_TOL * std::max(a, b);
+}
+
+inline int fold_from_pair(float raw, float reference, float nyq)
+{
+    return static_cast<int>(
+        std::lround((reference - raw) / (2.0f * nyq)));
+}
+
+inline float huber_cost(float residual, float scale)
+{
+    residual = std::fabs(residual);
+
+    const float d = std::max(scale, 1e-3f);
+
+    if (residual <= d)
+        return 0.5f * residual * residual / d;
+
+    return residual - 0.5f * d;
+}
+
+struct Boundary {
+    int gate;
+    int neighbor;
+};
 
 struct Region {
     std::vector<int> gates;
-    std::vector<Boundary> boundary;   // edges from a gate in this region to a gate in another
+    std::vector<Boundary> boundary;
+
     float nyquist = 0.0f;
+
     int fold = 0;
     int version = 0;
+
     bool resolved = false;
+
+    // Diagnostics only. These NEVER veto propagation.
+    float best_cost = std::numeric_limits<float>::infinity();
+    float second_cost = std::numeric_limits<float>::infinity();
+    float confidence = 0.0f;
+    int evidence = 0;
 };
 
 struct Candidate {
-    int evidence;   // resolved-boundary-edge count behind this fold estimate: priority only
-    int region;
-    int fold;
-    int version;
-    bool operator<(const Candidate& other) const { return evidence < other.evidence; }
+    int evidence = 0;
+    int region = -1;
+    int fold = 0;
+    int version = 0;
+
+    // Larger is better. Used only to determine propagation order.
+    float priority = 0.0f;
+
+    bool operator<(const Candidate& o) const
+    {
+        if (priority != o.priority)
+            return priority < o.priority;
+
+        if (evidence != o.evidence)
+            return evidence < o.evidence;
+
+        return region > o.region;
+    }
 };
 
-struct FoldEvidence {
-    bool has_evidence;
-    int fold;
-    int evidence;
+// -----------------------------------------------------------------------------
+// Score all integer fold hypotheses for one unresolved region.
+//
+// We compare the candidate-corrected boundary value against the already
+// resolved neighbor. The entire boundary participates.
+//
+// IMPORTANT:
+//   This function does not decide whether the result is "safe enough".
+//   It always returns the best available hypothesis.
+// -----------------------------------------------------------------------------
+
+struct FoldScore {
+    int fold = 0;
+    float cost = std::numeric_limits<float>::infinity();
 };
+
+struct FoldEvaluation {
+    FoldScore best;
+    FoldScore second;
+
+    int evidence = 0;
+    int best_support = 0;
+    int second_support = 0;
+};
+
+FoldEvaluation evaluate_region(
+    const Region& region,
+    const std::vector<int>& labels,
+    const std::vector<Region>& regions,
+    const std::vector<float>& grid,
+    const std::vector<float>& nyq)
+{
+    FoldEvaluation result;
+
+    std::array<float, 2 * MAX_FOLDS + 1> cost{};
+    std::array<int, 2 * MAX_FOLDS + 1> support{};
+
+    cost.fill(0.0f);
+    support.fill(0);
+
+    for (const Boundary& edge : region.boundary) {
+        const int nb = labels[edge.neighbor];
+
+        if (nb < 0 || !regions[nb].resolved)
+            continue;
+
+        if (!std::isfinite(grid[edge.gate]) ||
+            !std::isfinite(grid[edge.neighbor]))
+            continue;
+
+        const float edge_nyq =
+            std::min(region.nyquist, nyq[edge.neighbor]);
+
+        if (!valid_nyq(edge_nyq))
+            continue;
+
+        if (!compatible_nyq(region.nyquist, nyq[edge.neighbor]))
+            continue;
+
+        ++result.evidence;
+
+        const float raw = grid[edge.gate];
+        const float reference = grid[edge.neighbor];
+
+        const float huber_scale =
+            std::max(1.0f, HUBER_FRAC * edge_nyq);
+
+        for (int k = -MAX_FOLDS; k <= MAX_FOLDS; ++k) {
+            const int idx = k + MAX_FOLDS;
+
+            const float corrected =
+                raw + static_cast<float>(k) * 2.0f * region.nyquist;
+
+            const float residual =
+                corrected - reference;
+
+            cost[idx] += huber_cost(residual, huber_scale);
+
+            // "Support" means the corrected value is at least reasonably
+            // close to the neighboring resolved field.
+            if (std::fabs(residual) <= 0.50f * edge_nyq)
+                ++support[idx];
+        }
+    }
+
+    if (result.evidence == 0)
+        return result;
+
+    int best_idx = 0;
+
+    for (int i = 1; i < static_cast<int>(cost.size()); ++i) {
+        if (cost[i] < cost[best_idx])
+            best_idx = i;
+    }
+
+    int second_idx = -1;
+
+    for (int i = 0; i < static_cast<int>(cost.size()); ++i) {
+        if (i == best_idx)
+            continue;
+
+        if (second_idx < 0 || cost[i] < cost[second_idx])
+            second_idx = i;
+    }
+
+    result.best.fold = best_idx - MAX_FOLDS;
+    result.best.cost = cost[best_idx];
+    result.best_support = support[best_idx];
+
+    if (second_idx >= 0) {
+        result.second.fold = second_idx - MAX_FOLDS;
+        result.second.cost = cost[second_idx];
+        result.second_support = support[second_idx];
+    }
+
+    return result;
+}
+
+// -----------------------------------------------------------------------------
+// Per-tilt dealiasing.
+// -----------------------------------------------------------------------------
 
 void dealias_tilt(SingleTilt& tilt)
 {
     std::vector<float>& packed = tilt.Radials_VEL;
-    if (packed.size() < 24 || packed.size() % 3 != 0) return;
+
+    if (packed.size() < 24 || packed.size() % 3 != 0)
+        return;
+
     const size_t count = packed.size() / 3;
-    if (count > static_cast<size_t>(std::numeric_limits<int>::max() / 3)) return;
+
+    if (count >
+        static_cast<size_t>(
+            std::numeric_limits<int>::max() / 3))
+        return;
 
     const float fallback_nyq =
-        static_cast<float>(tilt.vol_el_rad.rad.nyquist_vel) / 100.0f;
+        static_cast<float>(
+            tilt.vol_el_rad.rad.nyquist_vel) / 100.0f;
 
-    // ------------------------------------------------------------------
-    // Group the packed (azimuth, dist, value) triplets into rays. This
-    // plumbing is unchanged: it was not implicated in the tornado failure
-    // and is correct as originally written.
-    // ------------------------------------------------------------------
-    const int num_triplets = static_cast<int>(count);
+    const int n = static_cast<int>(count);
+
     std::vector<VelocityRay> rays = tilt.VelocityRays;
+
+    // ------------------------------------------------------------------------
+    // Ray construction / validation.
+    // ------------------------------------------------------------------------
+
     if (rays.empty()) {
-        for (int t = 0; t < num_triplets; ++t) {
-            if (t == 0 || std::fabs(packed[3 * t] - packed[3 * (t - 1)]) > AZ_EPS ||
-                packed[3 * t + 1] <= packed[3 * (t - 1) + 1]) {
-                rays.push_back({static_cast<size_t>(t), 0, fallback_nyq, tilt.gateSpacing});
+        if (!valid_nyq(fallback_nyq))
+            return;
+
+        rays.reserve(720);
+
+        for (int t = 0; t < n; ++t) {
+            if (t == 0 ||
+                std::fabs(
+                    packed[3 * t] -
+                    packed[3 * (t - 1)]) > AZ_EPS ||
+                packed[3 * t + 1] <=
+                    packed[3 * (t - 1) + 1]) {
+
+                rays.push_back({
+                    static_cast<size_t>(t),
+                    0,
+                    fallback_nyq,
+                    tilt.gateSpacing
+                });
             }
+
             ++rays.back().count;
         }
-        if (!tilt.VelNyquist.empty() && tilt.VelNyquist.size() != rays.size()) return;
+
+        if (!tilt.VelNyquist.empty() &&
+            tilt.VelNyquist.size() != rays.size())
+            return;
+
         for (size_t r = 0; r < rays.size(); ++r) {
-            if (!tilt.VelNyquist.empty()) rays[r].nyquist = tilt.VelNyquist[r];
-        }
-    }
-    if (rays.size() < 4) return;
+            if (!tilt.VelNyquist.empty() &&
+                valid_nyq(tilt.VelNyquist[r])) {
 
-    size_t expected_start = 0;
-    std::vector<float> nyq(count, VELOCITY_NAN);
-    for (const auto& ray : rays) {
-        if (ray.start != expected_start || ray.count == 0 || ray.count > count - expected_start) return;
-        expected_start += ray.count;
-        if (!std::isfinite(ray.gateSpacing) || ray.gateSpacing <= 0.0f) return;
-        if (!std::isfinite(packed[3 * ray.start]) || packed[3 * ray.start] < 0.0f || packed[3 * ray.start] >= 360.0f) return;
-        for (size_t t = ray.start; t < expected_start; ++t) {
-            if (!std::isfinite(packed[3 * t + 1]) || (t > ray.start && packed[3 * t + 1] <= packed[3 * (t - 1) + 1])) return;
-            if (std::isfinite(ray.nyquist) && ray.nyquist > 0.0f) nyq[t] = ray.nyquist;
-        }
-    }
-    if (expected_start != count) return;
-
-    auto az_gap = [&](size_t a, size_t b) {
-        return std::fmod(packed[3 * rays[b].start] - packed[3 * rays[a].start] + 360.0f, 360.0f);
-    };
-    std::vector<float> az_steps;
-    for (size_t r = 1; r < rays.size(); ++r) {
-        const float gap = az_gap(r - 1, r);
-        if (gap > AZ_EPS && gap <= 1.5f) az_steps.push_back(gap);
-    }
-    float max_gap = 0.0f;
-    if (!az_steps.empty()) {
-        std::sort(az_steps.begin(), az_steps.end());
-        max_gap = std::min(1.5f, 1.5f * az_steps[az_steps.size() / 2]);
-    }
-
-    // ------------------------------------------------------------------
-    // Densify into a ray x gate grid (NaN = missing gate) and connect
-    // range/azimuth neighbors. Unchanged from the original.
-    // ------------------------------------------------------------------
-    std::vector<float> grid(count);
-    std::vector<std::array<int, 4>> neighbors(count, {-1, -1, -1, -1});
-    for (size_t t = 0; t < count; ++t) grid[t] = packed[3 * t + 2];
-    auto connect = [&](int a, int b, int direction) {
-        if (!std::isfinite(grid[a]) || !std::isfinite(grid[b]) || !std::isfinite(nyq[a]) || !std::isfinite(nyq[b])) return;
-        neighbors[a][direction] = b;
-        neighbors[b][direction + 1] = a;
-    };
-    for (size_t r = 0; r < rays.size(); ++r) {
-        const auto& ray = rays[r];
-        const size_t end = ray.start + ray.count;
-        for (size_t t = ray.start + 1; t < end; ++t) {
-            if (std::fabs(packed[3 * t + 1] - packed[3 * (t - 1) + 1] - ray.gateSpacing) <= 0.1f) {
-                connect(static_cast<int>(t - 1), static_cast<int>(t), 0);
+                rays[r].nyquist =
+                    tilt.VelNyquist[r];
             }
         }
-        const size_t next = (r + 1) % rays.size();
-        const float gap = az_gap(r, next);
-        if (gap <= AZ_EPS || gap > max_gap) continue;
-        const auto& other = rays[next];
-        size_t a = ray.start, b = other.start;
-        while (a < end && b < other.start + other.count) {
-            const float diff = packed[3 * a + 1] - packed[3 * b + 1];
-            if (std::fabs(diff) <= 0.1f) {
-                connect(static_cast<int>(a++), static_cast<int>(b++), 2);
-            } else if (diff < 0.0f) {
+    }
+
+    if (rays.size() < 4)
+        return;
+
+    // Always use the tilt Nyquist as fallback.
+    std::vector<float> nyq(count, VEL_NAN);
+
+    size_t expected = 0;
+
+    for (const auto& ray : rays) {
+        if (ray.start != expected ||
+            ray.count == 0 ||
+            ray.count > count - expected)
+            return;
+
+        if (!std::isfinite(ray.gateSpacing) ||
+            ray.gateSpacing <= 0.0f)
+            return;
+
+        const float ray_nyq =
+            valid_nyq(ray.nyquist)
+                ? ray.nyquist
+                : fallback_nyq;
+
+        if (!valid_nyq(ray_nyq))
+            return;
+
+        const size_t end =
+            ray.start + ray.count;
+
+        const float az =
+            packed[3 * ray.start];
+
+        if (!std::isfinite(az) ||
+            az < 0.0f ||
+            az >= 360.0f)
+            return;
+
+        for (size_t t = ray.start; t < end; ++t) {
+            if (!std::isfinite(
+                    packed[3 * t + 1]))
+                return;
+
+            if (t > ray.start &&
+                packed[3 * t + 1] <=
+                    packed[3 * (t - 1) + 1])
+                return;
+
+            nyq[t] = ray_nyq;
+        }
+
+        expected = end;
+    }
+
+    if (expected != count)
+        return;
+
+    // ------------------------------------------------------------------------
+    // Estimate normal azimuth spacing.
+    // ------------------------------------------------------------------------
+
+    float az_sum = 0.0f;
+    int az_samples = 0;
+
+    for (size_t r = 1; r < rays.size(); ++r) {
+        const float gap = std::fmod(
+            packed[3 * rays[r].start] -
+            packed[3 * rays[r - 1].start] +
+            360.0f,
+            360.0f);
+
+        if (gap > AZ_EPS && gap <= 1.5f) {
+            az_sum += gap;
+            ++az_samples;
+        }
+    }
+
+    const float typical_az =
+        az_samples
+            ? az_sum / az_samples
+            : 1.0f;
+
+    const float max_az_gap =
+        std::min(1.5f, 1.8f * typical_az);
+
+    // ------------------------------------------------------------------------
+    // Grid + 4-neighbor graph.
+    // ------------------------------------------------------------------------
+
+    std::vector<float> grid(count);
+
+    for (size_t i = 0; i < count; ++i)
+        grid[i] = packed[3 * i + 2];
+
+    std::vector<std::array<int, 4>> neighbors(
+        count,
+        {-1, -1, -1, -1});
+
+    auto connect = [&](int a, int b, int dir) {
+        if (a < 0 || b < 0)
+            return;
+
+        if (!std::isfinite(grid[a]) ||
+            !std::isfinite(grid[b]))
+            return;
+
+        if (!valid_nyq(nyq[a]) ||
+            !valid_nyq(nyq[b]))
+            return;
+
+        neighbors[a][dir] = b;
+        neighbors[b][dir ^ 1] = a;
+    };
+
+    for (size_t r = 0; r < rays.size(); ++r) {
+        const auto& ray = rays[r];
+        const size_t end =
+            ray.start + ray.count;
+
+        // Range neighbors.
+        for (size_t t = ray.start + 1;
+             t < end;
+             ++t) {
+
+            const float dr =
+                packed[3 * t + 1] -
+                packed[3 * (t - 1) + 1];
+
+            if (std::fabs(
+                    dr - ray.gateSpacing) <=
+                RANGE_TOL) {
+
+                connect(
+                    static_cast<int>(t - 1),
+                    static_cast<int>(t),
+                    0);
+            }
+        }
+
+        // Adjacent azimuth rays.
+        const size_t next =
+            (r + 1) % rays.size();
+
+        const float gap = std::fmod(
+            packed[3 * rays[next].start] -
+            packed[3 * ray.start] +
+            360.0f,
+            360.0f);
+
+        if (gap <= AZ_EPS ||
+            gap > max_az_gap)
+            continue;
+
+        size_t a = ray.start;
+        size_t b = rays[next].start;
+
+        const size_t ae =
+            ray.start + ray.count;
+
+        const size_t be =
+            rays[next].start +
+            rays[next].count;
+
+        while (a < ae && b < be) {
+            const float d =
+                packed[3 * a + 1] -
+                packed[3 * b + 1];
+
+            if (std::fabs(d) <= RANGE_TOL) {
+                connect(
+                    static_cast<int>(a),
+                    static_cast<int>(b),
+                    2);
+
                 ++a;
-            } else {
+                ++b;
+            }
+            else if (d < 0.0f) {
+                ++a;
+            }
+            else {
                 ++b;
             }
         }
     }
 
-    // ------------------------------------------------------------------
-    // Phase 1 -- Segmentation.
+    // ------------------------------------------------------------------------
+    // Phase 1: raw connected components.
     //
-    // Flood fill into regions of mutually consistent *raw* (still aliased)
-    // value. The threshold (SEG_FRAC = 0.18, vs. the previous 0.25) is
-    // deliberately tighter than "about half a Nyquist interval": a genuine
-    // shear discontinuity -- the entire point of a TVS -- should fall
-    // *between* two regions, not get smoothed into one. Small regions are
-    // fine now; resolution below carries no minimum region size or edge
-    // count, unlike before.
-    // ------------------------------------------------------------------
-    std::vector<int> labels(count, -1);
+    // A region is locally continuous. A boundary is where the observed
+    // velocities differ too much to belong to the same branch.
+    // ------------------------------------------------------------------------
+
+    std::vector<int> labels(
+        count,
+        -1);
+
     std::vector<Region> regions;
-    for (int t = 0; t < num_triplets; ++t) {
-        if (labels[t] >= 0 || !std::isfinite(grid[t]) || !std::isfinite(nyq[t])) continue;
-        const int label = static_cast<int>(regions.size());
+
+    regions.reserve(
+        count / 8 + 1);
+
+    for (int start = 0;
+         start < n;
+         ++start) {
+
+        if (labels[start] >= 0 ||
+            !std::isfinite(grid[start]) ||
+            !valid_nyq(nyq[start]))
+            continue;
+
+        const int id =
+            static_cast<int>(
+                regions.size());
+
         regions.emplace_back();
-        auto& region = regions.back();
-        region.nyquist = nyq[t];
-        region.gates.push_back(t);
-        labels[t] = label;
-        for (size_t cursor = 0; cursor < region.gates.size(); ++cursor) {
-            const int gate = region.gates[cursor];
-            for (const int neighbor : neighbors[gate]) {
-                if (neighbor < 0 || labels[neighbor] >= 0 || nyq[neighbor] != region.nyquist) continue;
-                if (std::fabs(grid[gate] - grid[neighbor]) > SEG_FRAC * region.nyquist) continue;
-                labels[neighbor] = label;
-                region.gates.push_back(neighbor);
+
+        Region& region =
+            regions.back();
+
+        region.nyquist =
+            nyq[start];
+
+        region.gates.push_back(start);
+        labels[start] = id;
+
+        for (size_t p = 0;
+             p < region.gates.size();
+             ++p) {
+
+            const int g =
+                region.gates[p];
+
+            for (const int nb :
+                 neighbors[g]) {
+
+                if (nb < 0 ||
+                    labels[nb] >= 0)
+                    continue;
+
+                if (!std::isfinite(
+                        grid[nb]))
+                    continue;
+
+                if (!compatible_nyq(
+                        region.nyquist,
+                        nyq[nb]))
+                    continue;
+
+                const float edge_nyq =
+                    std::min(
+                        region.nyquist,
+                        nyq[nb]);
+
+                if (std::fabs(
+                        grid[g] - grid[nb]) >
+                    SEG_FRAC * edge_nyq)
+                    continue;
+
+                labels[nb] = id;
+                region.gates.push_back(nb);
             }
         }
     }
-    if (regions.empty()) return;
 
-    for (int t = 0; t < num_triplets; ++t) {
-        if (labels[t] < 0) continue;
-        for (const int neighbor : neighbors[t]) {
-            if (neighbor >= 0 && labels[neighbor] >= 0 && labels[neighbor] != labels[t]) {
-                regions[labels[t]].boundary.push_back({t, neighbor});
-            }
+    if (regions.empty())
+        return;
+
+    // ------------------------------------------------------------------------
+    // Boundary list.
+    // ------------------------------------------------------------------------
+
+    for (int g = 0;
+         g < n;
+         ++g) {
+
+        const int a =
+            labels[g];
+
+        if (a < 0)
+            continue;
+
+        for (const int nb :
+             neighbors[g]) {
+
+            if (nb < 0)
+                continue;
+
+            const int b =
+                labels[nb];
+
+            if (b >= 0 && b != a)
+                regions[a].boundary.push_back(
+                    {g, nb});
         }
     }
 
-    // ------------------------------------------------------------------
-    // Phase 2 -- Best-first fold resolution.
+    // ------------------------------------------------------------------------
+    // Phase 2: best-first propagation.
     //
-    // A region becomes an eligible candidate the moment it has >=1 resolved
-    // neighbor. "evidence" (resolved boundary-edge count) only sets queue
-    // priority, so well-supported regions are folded first and uncertainty
-    // doesn't propagate ahead of confidence -- but nothing is ever refused
-    // for lack of a quorum. This is exactly what lets a 2-gate TVS core get
-    // folded correctly off a single trustworthy edge to the surrounding
-    // flow, instead of being stranded as an "unresolved island".
-    // ------------------------------------------------------------------
+    // IMPORTANT DIFFERENCE FROM v5/v6:
+    //
+    // There is NO acceptance threshold.
+    //
+    // If one resolved boundary edge exists, a fold candidate is generated.
+    // Confidence only controls ordering.
+    // ------------------------------------------------------------------------
+
     std::priority_queue<Candidate> pq;
-    size_t resolved_count = 0;
 
-    auto best_fold = [&](int index) -> FoldEvidence {
-        auto& region = regions[index];
-        std::array<int, 2 * MAX_FOLDS + 1> votes{};
-        int evidence = 0;
-        for (const auto& edge : region.boundary) {
-            const int nb_region = labels[edge.neighbor];
-            if (!regions[nb_region].resolved) continue;
-            const int k = fold_estimate(grid[edge.gate], grid[edge.neighbor], region.nyquist);
-            if (std::abs(k) > MAX_FOLDS) continue;
-            ++votes[k + MAX_FOLDS];
-            ++evidence;
-        }
-        if (evidence == 0) return {false, 0, 0};
-        const int best_bin = static_cast<int>(std::max_element(votes.begin(), votes.end()) - votes.begin());
-        return {true, best_bin - MAX_FOLDS, evidence};
-    };
+    size_t resolved = 0;
 
-    auto push_candidate = [&](int index) {
-        auto& region = regions[index];
-        if (region.resolved) return;
-        const FoldEvidence fe = best_fold(index);
-        if (!fe.has_evidence) return;
+    auto propose = [&](int id) {
+        Region& region =
+            regions[id];
+
+        if (region.resolved)
+            return;
+
+        const FoldEvaluation eval =
+            evaluate_region(
+                region,
+                labels,
+                regions,
+                grid,
+                nyq);
+
+        if (eval.evidence <= 0)
+            return;
+
+        region.best_cost =
+            eval.best.cost;
+
+        region.second_cost =
+            eval.second.cost;
+
+        region.evidence =
+            eval.evidence;
+
+        const float margin =
+            (std::isfinite(eval.second.cost) &&
+             eval.second.cost >
+                 1e-6f)
+                ? std::clamp(
+                      (eval.second.cost -
+                       eval.best.cost) /
+                      eval.second.cost,
+                      0.0f,
+                      1.0f)
+                : 1.0f;
+
+        region.confidence = margin;
+
         ++region.version;
-        pq.push({fe.evidence, index, fe.fold, region.version});
+
+        // Stronger evidence and larger margin go first.
+        // This is ONLY queue priority.
+        const float priority =
+            static_cast<float>(
+                eval.evidence) *
+                (0.25f + 0.75f * margin);
+
+        pq.push({
+            eval.evidence,
+            id,
+            eval.best.fold,
+            region.version,
+            priority
+        });
     };
 
-    auto resolve = [&](int index, int fold) {
-        auto& region = regions[index];
+    auto resolve = [&](int id, int fold) {
+        Region& region =
+            regions[id];
+
+        if (region.resolved)
+            return;
+
         region.fold = fold;
         region.resolved = true;
-        ++resolved_count;
-        for (const int gate : region.gates) grid[gate] += fold * 2.0f * region.nyquist;
-        std::vector<int> touched;
-        for (const auto& edge : region.boundary) {
-            const int nb_region = labels[edge.neighbor];
-            if (!regions[nb_region].resolved) touched.push_back(nb_region);
+        ++resolved;
+
+        const float delta =
+            static_cast<float>(fold) *
+            2.0f *
+            region.nyquist;
+
+        for (const int g :
+             region.gates)
+            grid[g] += delta;
+
+        for (const Boundary& edge :
+             region.boundary) {
+
+            const int nb =
+                labels[edge.neighbor];
+
+            if (nb >= 0 &&
+                !regions[nb].resolved)
+                propose(nb);
         }
-        std::sort(touched.begin(), touched.end());
-        touched.erase(std::unique(touched.begin(), touched.end()), touched.end());
-        for (const int t : touched) push_candidate(t);
     };
 
-    // Seed order for disconnected pieces of the scan (data voids with no
-    // boundary at all between them): take the largest region first, tie
-    // broken toward the higher Nyquist, since that fragment is the least
-    // likely to be uniformly folded relative to the rest of the volume.
-    std::vector<int> seed_order(regions.size());
-    std::iota(seed_order.begin(), seed_order.end(), 0);
-    std::sort(seed_order.begin(), seed_order.end(), [&](int a, int b) {
-        if (regions[a].gates.size() != regions[b].gates.size()) return regions[a].gates.size() > regions[b].gates.size();
-        return regions[a].nyquist > regions[b].nyquist;
-    });
-    size_t seed_cursor = 0;
-    auto seed_next_island = [&]() {
-        while (seed_cursor < seed_order.size() && regions[seed_order[seed_cursor]].resolved) ++seed_cursor;
-        if (seed_cursor < seed_order.size()) resolve(seed_order[seed_cursor], 0);
-    };
-
-    while (resolved_count < regions.size()) {
-        if (pq.empty()) {
-            seed_next_island();
-            continue;
-        }
-        const Candidate top = pq.top();
-        pq.pop();
-        auto& region = regions[top.region];
-        if (!region.resolved && top.version == region.version) resolve(top.region, top.fold);
-    }
-
-    // ------------------------------------------------------------------
-    // Phase 3 -- Bounded local repair.
+    // ------------------------------------------------------------------------
+    // Initial reference for a disconnected scan.
     //
-    // Best-first propagation commits each region's fold using whichever
-    // neighbors happened to resolve first; in a narrow, high-gradient
-    // feature an early, low-evidence commitment can turn out to be locally
-    // wrong even though it was the best information available at the time.
-    // This relaxes every region a few times against *all* of its now-
-    // resolved neighbors -- an ICM-style pass, the same style of local
-    // energy minimization used for Markov-random-field phase unwrapping --
-    // shifting a region's fold by +/-1 whenever that strictly reduces total
-    // boundary mismatch. Bounded to a handful of passes and self-limiting:
-    // a shift is only taken when it improves on the status quo, so this
-    // cannot oscillate or run away.
-    // ------------------------------------------------------------------
-    for (int pass = 0; pass < REPAIR_PASSES; ++pass) {
-        bool changed = false;
-        for (size_t i = 0; i < regions.size(); ++i) {
-            auto& region = regions[i];
-            if (region.boundary.empty()) continue;
-            double mismatch[3] = {0.0, 0.0, 0.0}; // shift -1, 0, +1
-            int considered = 0;
-            for (const auto& edge : region.boundary) {
-                const int nb_region = labels[edge.neighbor];
-                if (!regions[nb_region].resolved) continue;
-                ++considered;
-                for (int shift = -1; shift <= 1; ++shift) {
-                    const float candidate_value = grid[edge.gate] + shift * 2.0f * region.nyquist;
-                    mismatch[shift + 1] += std::fabs(candidate_value - grid[edge.neighbor]);
-                }
-            }
-            if (considered == 0) continue;
-            const int best_shift = static_cast<int>(std::min_element(mismatch, mismatch + 3) - mismatch) - 1;
-            if (best_shift != 0 && mismatch[best_shift + 1] < 0.9 * mismatch[1]) {
-                for (const int gate : region.gates) grid[gate] += best_shift * 2.0f * region.nyquist;
-                region.fold += best_shift;
-                changed = true;
-            }
+    // This is a reference, not a physical claim that zero-fold is globally
+    // correct. Absolute anchoring is fundamentally unavailable from one
+    // isolated velocity field.
+    // ------------------------------------------------------------------------
+
+    int seed = -1;
+
+    for (size_t i = 0;
+         i < regions.size();
+         ++i) {
+
+        if (seed < 0 ||
+            regions[i].gates.size() >
+                regions[seed].gates.size() ||
+            (regions[i].gates.size() ==
+                 regions[seed].gates.size() &&
+             regions[i].nyquist >
+                 regions[seed].nyquist)) {
+
+            seed =
+                static_cast<int>(i);
         }
-        if (!changed) break;
     }
 
-    // ------------------------------------------------------------------
-    // Write corrected values back into the packed triplets.
-    // ------------------------------------------------------------------
-    for (size_t t = 0; t < count; ++t) packed[3 * t + 2] = grid[t];
+    resolve(seed, 0);
+
+    // ------------------------------------------------------------------------
+    // Connected propagation.
+    // ------------------------------------------------------------------------
+
+    while (!pq.empty()) {
+        const Candidate c =
+            pq.top();
+
+        pq.pop();
+
+        Region& region =
+            regions[c.region];
+
+        if (region.resolved ||
+            region.version !=
+                c.version)
+            continue;
+
+        resolve(
+            c.region,
+            c.fold);
+    }
+
+    // ------------------------------------------------------------------------
+    // Disconnected islands.
+    //
+    // Each disconnected component needs an arbitrary reference. Keep v2's
+    // largest-island fold-0 behavior rather than inventing a global anchor.
+    // ------------------------------------------------------------------------
+
+    while (resolved < regions.size()) {
+        seed = -1;
+
+        for (size_t i = 0;
+             i < regions.size();
+             ++i) {
+
+            if (regions[i].resolved)
+                continue;
+
+            if (seed < 0 ||
+                regions[i].gates.size() >
+                    regions[seed].gates.size()) {
+
+                seed =
+                    static_cast<int>(i);
+            }
+        }
+
+        if (seed < 0)
+            break;
+
+        resolve(seed, 0);
+
+        while (!pq.empty()) {
+            const Candidate c =
+                pq.top();
+
+            pq.pop();
+
+            Region& region =
+                regions[c.region];
+
+            if (region.resolved ||
+                region.version !=
+                    c.version)
+                continue;
+
+            resolve(
+                c.region,
+                c.fold);
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // Phase 3: bounded local repair.
+    //
+    // Repair is deliberately conservative. Unlike propagation, this phase
+    // CAN reject a correction because it is modifying an already-resolved
+    // region rather than establishing a new fold hypothesis.
+    //
+    // We test +/- one fold against all resolved boundary neighbors.
+    // ------------------------------------------------------------------------
+
+    for (Region& region :
+         regions) {
+
+        if (region.boundary.size() < 2)
+            continue;
+
+        const float interval =
+            2.0f *
+            region.nyquist;
+
+        double e0 = 0.0;
+        double em = 0.0;
+        double ep = 0.0;
+
+        int support = 0;
+        int sm = 0;
+        int sp = 0;
+
+        for (const Boundary& edge :
+             region.boundary) {
+
+            const int nb =
+                labels[edge.neighbor];
+
+            if (nb < 0 ||
+                !regions[nb].resolved)
+                continue;
+
+            const float v =
+                grid[edge.gate];
+
+            const float ref =
+                grid[edge.neighbor];
+
+            if (!std::isfinite(v) ||
+                !std::isfinite(ref))
+                continue;
+
+            const float a =
+                std::fabs(v - ref);
+
+            const float m =
+                std::fabs(
+                    v - interval - ref);
+
+            const float p =
+                std::fabs(
+                    v + interval - ref);
+
+            e0 += a;
+            em += m;
+            ep += p;
+
+            ++support;
+
+            if (m < 0.75f * a)
+                ++sm;
+
+            if (p < 0.75f * a)
+                ++sp;
+        }
+
+        if (support < 2)
+            continue;
+
+        int shift = 0;
+
+        if (sm >= 2 &&
+            em < 0.80 * e0 &&
+            em < ep) {
+
+            shift = -1;
+        }
+        else if (sp >= 2 &&
+                 ep < 0.80 * e0 &&
+                 ep < em) {
+
+            shift = +1;
+        }
+
+        if (shift != 0) {
+            const float delta =
+                static_cast<float>(shift) *
+                interval;
+
+            for (const int g :
+                 region.gates) {
+
+                grid[g] += delta;
+            }
+
+            region.fold += shift;
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // Output.
+    // ------------------------------------------------------------------------
+
+    for (size_t i = 0;
+         i < count;
+         ++i) {
+
+        packed[3 * i + 2] =
+            grid[i];
+    }
 }
 
 } // namespace
 
 void dealias_velocity_volume_v3(AllTilt& volume)
 {
-    for (auto& tilt : volume.Tilts) {
+    for (auto& tilt :
+         volume.Tilts) {
+
         dealias_tilt(tilt);
     }
 }

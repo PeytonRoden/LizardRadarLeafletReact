@@ -13,7 +13,7 @@ export default function VolumePane({ voxelData, status, error, bounds, selectedC
   const [rayStop, setRayStop] = useState(0.99);
   const [opacity, setOpacity] = useState(0.99);
   const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
-  const maxVoxels = isCoarsePointer ? 128 : 256;
+  const maxVoxels = isCoarsePointer ? 256 : 512;
 
   return (
     <section className="volume-pane" aria-label="3D radar volume" aria-busy={status === "loading"}>

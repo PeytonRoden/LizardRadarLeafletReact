@@ -54,6 +54,8 @@ CPP_SOURCES := $(wildcard $(SRC_DIR)/*.cpp)
 
 BZ2_SOURCES := \
   bzlib.c \
+  blocksort.c \
+  compress.c \
   decompress.c \
   crctable.c \
   huffman.c \
@@ -137,6 +139,8 @@ EMCC_LDFLAGS := \
                           '_get_interpolated_voxels_size_latitude', \
                           '_get_interpolated_voxels_size_longitude', \
                           '_get_interpolated_voxels_height', \
+                          '_get_dealias_velocity', \
+                          '_set_dealias_velocity', \
                           '_malloc', \
                           '_free']" \
   -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap','HEAPU8','lengthBytesUTF8','stringToUTF8','HEAPF32']" \
@@ -149,9 +153,24 @@ EMCC_LDFLAGS := \
 # ========================
 # Targets
 # ========================
-.PHONY: all native wasm clean copy-wasm test
+# Object set for standalone tools.
+# main.cpp is compiled a second time via main_as_lib.cpp, which renames its
+# main() so it does not clash with each tool's own entry point. This gives
+# tools access to the globals and parsing functions normally defined in main.cpp
+# without the symbol conflict.
+CPP_HELPER_OBJS    := $(filter-out $(OBJ_NATIVE)/main.o, $(CPP_OBJS_NATIVE))
+CPP_TOOL_OBJS      := $(CPP_HELPER_OBJS) $(OBJ_NATIVE)/main_as_lib.o
+
+.PHONY: all native wasm clean copy-wasm test tools \
+        compare_dealias bench_dealias diagnose_velocity
 
 all: native wasm
+
+tools: $(BUILD_DIR)/compare_dealias $(BUILD_DIR)/bench_dealias $(BUILD_DIR)/diagnose_velocity
+
+compare_dealias:    $(BUILD_DIR)/compare_dealias
+bench_dealias:      $(BUILD_DIR)/bench_dealias
+diagnose_velocity:  $(BUILD_DIR)/diagnose_velocity
 
 $(CPP_OBJS_NATIVE) $(CPP_OBJS_WASM): $(wildcard $(SRC_DIR)/*.h)
 
@@ -186,6 +205,25 @@ $(DIST_WASM)/$(WASM_MODULE).js: $(CPP_OBJS_WASM) $(BZ2_OBJS_WASM)
 $(OBJ_NATIVE)/libbz2.a: $(BZ2_OBJS_NATIVE)
 	@mkdir -p $(OBJ_NATIVE)
 	$(AR) rcs $@ $^
+
+# ------------------------
+# Standalone diagnostic / comparison tools
+# ------------------------
+$(OBJ_NATIVE)/main_as_lib.o: main_as_lib.cpp $(SRC_DIR)/main.cpp $(wildcard $(SRC_DIR)/*.h)
+	@mkdir -p $(OBJ_NATIVE)
+	$(CXX) $(CXXFLAGS) -Wno-main -c $< -o $@
+
+$(BUILD_DIR)/compare_dealias: compare_dealias.cpp $(CPP_TOOL_OBJS) $(OBJ_NATIVE)/libbz2.a
+	@mkdir -p $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+$(BUILD_DIR)/bench_dealias: bench_dealias.cpp $(CPP_TOOL_OBJS) $(OBJ_NATIVE)/libbz2.a
+	@mkdir -p $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+$(BUILD_DIR)/diagnose_velocity: diagnose_velocity.cpp $(CPP_TOOL_OBJS) $(OBJ_NATIVE)/libbz2.a
+	@mkdir -p $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $^ -o $@
 
 # ------------------------
 # Compile rules

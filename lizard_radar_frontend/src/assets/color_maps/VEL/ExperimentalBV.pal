@@ -1,0 +1,26 @@
+;
+; Experimental SRM/Velocity Scale
+;
+;
+;
+
+Product: BV
+Units:   KTS
+Step:    10
+Scale:   1.9426     ; converts internal units (M/S) to KTS
+
+RF: 128  0  128
+
+Color:       120   63    18   13 
+Color:        90   248  246  245      63   18   13 
+Color:        60   238  143   56     248  246  245 
+Color:        45   255  255    0     238  143   56 
+Color:        35   253  155  156     252  202  137 
+Color:        10    93    2    3     253   30   46 
+Color:         0   138  110  124     132   62   71    
+Color:       -10    87  124   85     109  131  107
+Color:       -35     3  239    0       0   48    0 
+Color:       -45   119  244  154     146  240  199     
+Color:       -60    14   22  255     158  238  220
+Color:       -90   238  186  248     5      8  255 
+Color:      -120    12  250  250     221  181  243 

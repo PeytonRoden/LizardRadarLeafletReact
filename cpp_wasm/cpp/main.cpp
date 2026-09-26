@@ -5,6 +5,17 @@
 #include "velocity_dealias_v2.h"
 #include "velocity_dealias_v3.h"
 
+#include "velocity_dealias_v4.h"
+#include "velocity_dealias_v5.h"
+#include "velocity_dealias_v7.h"
+#include "velocity_dealias_v8.h"
+#include "velocity_dealias_v9.h"
+#include "velocity_dealias_v10.h"
+#include "velocity_dealias_v10_1.h"
+#include "velocity_dealias_v10_2.h"
+#include "velocity_dealias_v10_3.h"
+#include "velocity_dealias_pyart_region.h"
+
 #include "structs_and_constants.h"
 #include <iostream>
 #include <ctime>
@@ -72,6 +83,8 @@ float longitude_topleft;
 
 float latitude_bottomright;
 float longitude_bottomright;
+
+bool dealias_velocity = true;
 
 
 //L_v(r) = Lv_0 + k_Lv * r
@@ -351,6 +364,7 @@ VOL_EL_RAD parse_vol_el_rad_blocks(const uint8_t* p_vol, const uint8_t* p_el, co
     rad.noise_h = read_be_float(p_rad); p_rad+=4;
     rad.noise_v = read_be_float(p_rad); p_rad+=4;
     rad.nyquist_vel = read_be16s(p_rad); p_rad+=2;
+    std::cout << "nyquist vel: " << rad.nyquist_vel << std::endl;
     std::memcpy(rad.spare, p_rad, 2); p_rad += 2;
 
     vol_el_rad.rad = rad;
@@ -450,6 +464,7 @@ void parse_one_moment(AllTilt& alltilts, const uint8_t* ref_ptr , MSG_31& msg31,
         current_tilt.count++;
 
         std::vector<float>* radials = get_moment_radials(current_tilt, moment_buf);
+        if (!radials) return;  // unrecognised moment type (e.g. unknown data block name)
 
         const bool is_vel = cStringsEqual(moment_buf, "VEL");
         const float ray_nyq_ms = is_vel ? read_radial_nyquist_ms(msg31_ptr, msg31.block_pointer_3) : NAN;
@@ -479,7 +494,8 @@ void parse_one_moment(AllTilt& alltilts, const uint8_t* ref_ptr , MSG_31& msg31,
 
             moment_val = (raw_val - MOMENT.offset) / MOMENT.scale;
 
-            float distance_m = (is_vel ? MOMENT.first_gate : 0) + i * MOMENT.gate_spacing; // gate_spacing in meters
+            //float distance_m = (is_vel ? MOMENT.first_gate : 0) + i * MOMENT.gate_spacing; // gate_spacing in meters
+            float distance_m = MOMENT.first_gate + i * MOMENT.gate_spacing;
 
             // RadialData point;
             // point.azimuth_deg = msg31.azimuth_angle;
@@ -768,6 +784,37 @@ AllTilt combine_all_tilts_from_thread_results(std::vector<AllTilt>& thread_resul
         append_radials(dst.VelNyquist, src.VelNyquist);
     };
 
+
+    //function to merge split cuts, for split cuts, 
+    // one split cut will have ref,vel, sw. 
+    // the other split cut will have ref, zdr, phi, rho
+    // they will be same angle within .1 degree, and only sisters in the std::vector<SingleTilt> Tilts; 
+    auto mergesplitcut = [&](SingleTilt& dst, const SingleTilt& src) {
+        //average elevation angles
+        dst.ElevationAngle = (dst.ElevationAngle + src.ElevationAngle) / 2.0f;
+
+        //check which one has ref, vel, sw and which one has zdr, phi, rho
+        //if dst has ref, vel, sw and src has zdr, phi, rho, then merge
+        //if dst has ref, zdr, phi, rho and src has ref, vel, sw, then merge
+        if (dst.Radials_REF.size() > 0 && dst.Radials_VEL.size() > 0 && dst.Radials_SW.size() > 0 && src.Radials_ZDR.size() > 0) {
+            //dst has ref, vel, sw and src has ref, zdr, phi, rho
+            //merge them
+            dst.Radials_REF = src.Radials_REF;
+            dst.Radials_ZDR = src.Radials_ZDR;
+            dst.Radials_PHI = src.Radials_PHI;
+            dst.Radials_RHO = src.Radials_RHO;
+
+        } else if (dst.Radials_ZDR.size() > 0 && src.Radials_REF.size() > 0 && src.Radials_VEL.size() > 0 && src.Radials_SW.size() > 0) {
+            //dst has ref, zdr, phi, rho and src has ref, vel, sw
+            //merge them
+            dst.Radials_VEL = src.Radials_VEL;
+            dst.Radials_SW = src.Radials_SW;
+        }
+
+        //delete src
+        
+    };
+
     combined.julian_date = pre_combined.julian_date;
 
     for (auto& tilt : pre_combined.Tilts) {
@@ -785,13 +832,45 @@ AllTilt combine_all_tilts_from_thread_results(std::vector<AllTilt>& thread_resul
                 merge_tilt(combined_tilt, tilt);
                 merged = true;
                 break;
-            }
+            } 
         }
 
         if (!merged) {
             combined.Tilts.push_back(tilt);
         }
     }
+
+
+    if (dealias_velocity) {
+        dealias_velocity_volume_pyart_region(combined);
+    }
+
+    AllTilt split_cut_combined;
+
+    for (auto& tilt : combined.Tilts) {
+        bool merged = false;
+
+        for (auto& combined_tilt : split_cut_combined.Tilts) {
+            // if (std::fabs(tilt.ElevationAngle - combined_tilt.ElevationAngle) < 0.1f &&
+            //     std::llabs(static_cast<long long>(tilt.msg_31.collect_ms) - static_cast<long long>(combined_tilt.msg_31.collect_ms)) < 30000) {
+            if (tilt.ElevationNumber - combined_tilt.ElevationNumber == 1 && std::fabs(tilt.ElevationAngle - combined_tilt.ElevationAngle) < 0.1f) {
+                //std::cout << "Combining tilts" << std::endl;
+                //std::cout << "tilt 1 elevation angle: " << combined_tilt.ElevationAngle << std::endl;
+                //std::cout << "tilt 2 elevation angle: " << tilt.ElevationAngle << std::endl;
+                //std::cout << "tilt 1 time: " << combined_tilt.msg_31.collect_ms << std::endl;
+                //std::cout << "tilt 2 time: " << tilt.msg_31.collect_ms << std::endl;
+                mergesplitcut(combined_tilt, tilt);
+                merged = true;
+                break;
+            }
+        }
+
+        if (!merged) {
+            split_cut_combined.Tilts.push_back(tilt);
+        }
+    }
+
+    combined = split_cut_combined;
 
     std::sort(combined.Tilts.begin(), combined.Tilts.end(), [](const SingleTilt& a, const SingleTilt& b) {
         return a.ElevationAngle < b.ElevationAngle;
@@ -953,6 +1032,16 @@ extern "C" {
     EMSCRIPTEN_KEEPALIVE
     int get_png_data_size() {
         return png_buffer.size();
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    bool get_dealias_velocity() {
+        return dealias_velocity;
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    void set_dealias_velocity(bool value) {
+        dealias_velocity = value;
     }
 
     EMSCRIPTEN_KEEPALIVE
@@ -1259,7 +1348,7 @@ extern "C" {
         // }
 
         combined = combine_all_tilts_from_thread_results(process_ldm_blocks_results);
-        dealias_velocity_volume_v3(combined);
+
         tilt_number_for_data = 0;
 
         for (auto& tilt : combined.Tilts) {

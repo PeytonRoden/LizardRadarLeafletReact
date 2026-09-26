@@ -5,6 +5,7 @@ import os
 import re
 from datetime import datetime, timedelta
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 app = FastAPI()
 
@@ -185,30 +186,61 @@ def latest_radar_scan(icao: str):
     }
 
 
+PARALLEL_CHUNKS = 6
+MIN_PARALLEL_SIZE = 2 * 1024 * 1024  # only parallelize if file > 2 MB
+
+
+def _fetch_range(url: str, start: int, end: int) -> bytes:
+    r = requests.get(url, headers={"Range": f"bytes={start}-{end}"}, timeout=(10, 60))
+    r.raise_for_status()
+    return r.content
+
+
 @app.get("/nexrad")
 def nexrad(url: str):
-    # make sure url contains: unidata-nexrad-level2
     if not url.startswith(f"{HTTP_ROOT}/"):
         raise HTTPException(status_code=400, detail="Invalid URL")
 
-    r = requests.get(url, stream=True, timeout=(10, 60))
-    r.raise_for_status()
+    head = requests.head(url, timeout=(10, 30))
+    head.raise_for_status()
 
-    def stream_chunks():
-        try:
-            yield from r.iter_content(chunk_size=1024 * 1024)
-        finally:
-            r.close()
+    content_length = int(head.headers.get("Content-Length", 0))
+    accepts_ranges = head.headers.get("Accept-Ranges", "") == "bytes"
 
-    headers = {"Access-Control-Allow-Origin": "*"}
-    if content_length := r.headers.get("Content-Length"):
-        headers["Content-Length"] = content_length
+    response_headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Content-Length": str(content_length),
+    }
 
-    return StreamingResponse(
-        stream_chunks(),
-        media_type="application/octet-stream",
-        headers=headers,
-    )
+    if not accepts_ranges or content_length < MIN_PARALLEL_SIZE:
+        # Fall back to single streaming connection
+        r = requests.get(url, stream=True, timeout=(10, 60))
+        r.raise_for_status()
+
+        def stream_single():
+            try:
+                yield from r.iter_content(chunk_size=1024 * 1024)
+            finally:
+                r.close()
+
+        return StreamingResponse(stream_single(), media_type="application/octet-stream", headers=response_headers)
+
+    # Parallel range download
+    chunk_size = content_length // PARALLEL_CHUNKS
+    ranges = [
+        (i * chunk_size, (i + 1) * chunk_size - 1 if i < PARALLEL_CHUNKS - 1 else content_length - 1)
+        for i in range(PARALLEL_CHUNKS)
+    ]
+
+    def stream_parallel():
+        futures = {}
+        with ThreadPoolExecutor(max_workers=PARALLEL_CHUNKS) as pool:
+            for i, (start, end) in enumerate(ranges):
+                futures[i] = pool.submit(_fetch_range, url, start, end)
+            for i in range(PARALLEL_CHUNKS):
+                yield futures[i].result()
+
+    return StreamingResponse(stream_parallel(), media_type="application/octet-stream", headers=response_headers)
 
 if __name__ == "__main__":
     import uvicorn

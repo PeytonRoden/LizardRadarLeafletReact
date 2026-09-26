@@ -8,7 +8,7 @@ import ColorMapSelection from "./ColorMapSelection";
 import { useState } from "react";
 
 
-export default function SelectionsPanel({ selectedMoment, setSelectedMoment, selectedDataTime, setSelectedDataTime, selectedRadarSite, historicalSelection, setHistoricalSelection, onHistoricalLoad, radarLoadStatus, radarLoadError, radarSiteSelected, selectedTiltIndex, setSelectedTiltIndex, tiltAngles, tiltInfo, selectedColorMap, setSelectedColorMap, radarOpacity, setRadarOpacity, onOpenWasmImage }) {
+export default function SelectionsPanel({ selectedMoment, setSelectedMoment, selectedDataTime, setSelectedDataTime, selectedRadarSite, historicalSelection, setHistoricalSelection, onHistoricalLoad, radarLoadStatus, radarLoadError, radarSiteSelected, selectedTiltIndex, setSelectedTiltIndex, tiltAngles, tiltInfo, selectedColorMap, setSelectedColorMap, radarOpacity, setRadarOpacity, dealiasVelocity, onDealiasVelocityChange, onOpenWasmImage }) {
     const [collapsed, setCollapsed] = useState(() => window.matchMedia("(max-width: 800px), (pointer: coarse)").matches);
     const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -69,6 +69,10 @@ export default function SelectionsPanel({ selectedMoment, setSelectedMoment, sel
                             <label className="advanced-opacity-control">
                                 <span>Radar opacity <output>{Math.round(radarOpacity * 100)}%</output></span>
                                 <input type="range" min="0" max="1" step="0.01" value={radarOpacity} onChange={(event) => setRadarOpacity(Number(event.target.value))} />
+                            </label>
+                            <label className="advanced-toggle-control">
+                                <input type="checkbox" checked={dealiasVelocity} onChange={(event) => onDealiasVelocityChange?.(event.target.checked)} />
+                                <span>Dealias velocity</span>
                             </label>
                             <button type="button" className="advanced-tool-button" onClick={onOpenWasmImage}>
                                 Open WASM image renderer

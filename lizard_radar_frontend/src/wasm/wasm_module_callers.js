@@ -234,3 +234,25 @@ export function readVoxelGrid(module) {
   };
 }
 
+
+
+
+export function setDealiasVelocity(module, enabled) {
+  if (!module._set_dealias_velocity) {
+    throw new Error("Dealias velocity setter WASM export is unavailable");
+  }
+  module._set_dealias_velocity(enabled);
+}
+
+export function toggleDealiasVelocity(module) {
+  const next = !getDealiasVelocity(module);
+  setDealiasVelocity(module, next);
+  return next;
+}
+
+export function getDealiasVelocity(module) {
+  if (!module._get_dealias_velocity) {
+    throw new Error("Get dealias velocity WASM export is unavailable");
+  }
+  return module._get_dealias_velocity();
+}

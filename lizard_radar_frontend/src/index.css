@@ -158,3 +158,32 @@ body {
   color: #e5f2ff;
   opacity: 1;
 }
+
+/* Cluster bubble */
+.radar-cluster {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(8, 13, 24, 0.82);
+  border: 2px solid rgba(56, 189, 248, 0.65);
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.radar-cluster:hover {
+  border-color: rgba(56, 189, 248, 0.95);
+  box-shadow: 0 0 22px rgba(56, 189, 248, 0.55);
+  transform: scale(1.1);
+}
+
+.radar-cluster-count {
+  color: #7dd3fc;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1;
+}

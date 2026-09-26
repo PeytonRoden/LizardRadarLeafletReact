@@ -13,7 +13,9 @@ async function fetchWithTimeout(path, { signal, timeoutMs = 20000, read } = {}) 
       } catch {
         detail = response.statusText;
       }
-      throw new Error(`${path} failed: ${response.status}${detail ? ` ${detail}` : ""}`);
+      const error = new Error(`${path} failed: ${response.status}${detail ? ` ${detail}` : ""}`);
+      error.status = response.status;
+      throw error;
     }
     return read ? await read(response) : response;
   } finally {
@@ -43,8 +45,16 @@ export async function getAvailableTimes(icao, year, month, day, signal) {
 }
 
 export async function getLatestScanUrl(icao, signal) {
-  const metadata = await fetchJson(`/latest/${encodeURIComponent(icao)}`, signal);
-  if (!metadata.url) throw new Error(`/latest/${icao} returned no URL`);
+  let metadata;
+  try {
+    metadata = await fetchJson(`/latest/${encodeURIComponent(icao)}`, signal);
+  } catch (error) {
+    if (error.status === 404) {
+      throw new Error(`No recent NEXRAD data is currently available for ${icao}.`);
+    }
+    throw error;
+  }
+  if (!metadata.url) throw new Error(`No recent NEXRAD data is currently available for ${icao}.`);
   return metadata.url;
 }
 

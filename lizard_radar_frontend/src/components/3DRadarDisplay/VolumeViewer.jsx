@@ -27,14 +27,14 @@ function createColorMap(colorMap) {
   return texture;
 }
 
-function createVolumeTexture(voxels, dimensions, range) {
+function createVolumeTexture(voxels, dimensions, range, scale = 1) {
   const data = new Uint8Array(voxels.length);
   const span = range.max - range.min || 1;
 
   for (let i = 0; i < voxels.length; i += 1) {
     const value = voxels[i];
     if (!Number.isFinite(value)) continue;
-    const normalized = Math.min(1, Math.max(0, (value - range.min) / span));
+    const normalized = Math.min(1, Math.max(0, (value * scale - range.min) / span));
     data[i] = 1 + Math.round(normalized * 254);
   }
 
@@ -158,7 +158,7 @@ export default function VolumeViewer({ voxels, dimensions, renderStyle, isoValue
     state.controls.maxDistance = boundingRadius * 8;
     state.controls.update();
 
-    const volumeTexture = createVolumeTexture(voxels, dimensions, selectedPalette.range);
+    const volumeTexture = createVolumeTexture(voxels, dimensions, selectedPalette.range, selectedPalette.scale);
     const colorMap = createColorMap(selectedPalette);
     const geometry = new THREE.BoxGeometry(latitude, longitude, height);
     geometry.translate(center.x, center.y, center.z);

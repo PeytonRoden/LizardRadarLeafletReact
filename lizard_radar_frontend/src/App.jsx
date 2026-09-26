@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import './App.css'
 
 import { loadNexradWasm } from './wasm/nexrad';
-import { populateVoxelGrid, readVoxelBounds, readVoxelGrid, releaseVoxelGrid, setVoxelBounds as setWasmVoxelBounds, setInterpolationParams as setWasmInterpolationParams, setMaxNumVoxels as setWasmMaxNumVoxels, DEFAULT_INTERPOLATION_PARAMS } from './wasm/wasm_module_callers';
+import { populateVoxelGrid, readVoxelBounds, readVoxelGrid, releaseVoxelGrid, setVoxelBounds as setWasmVoxelBounds, setInterpolationParams as setWasmInterpolationParams, setMaxNumVoxels as setWasmMaxNumVoxels, setDealiasVelocity as setWasmDealiasVelocity, DEFAULT_INTERPOLATION_PARAMS } from './wasm/wasm_module_callers';
 
 import MapView from "./components/MapView";
 import SelectionsPanel from "./components/selections/SelectionsPanel";
@@ -35,6 +35,7 @@ export default function App() {
   const [tiltInfo, setTiltInfo] = useState([]);
   const [selectedColorMap, setSelectedColorMap] = useState("REF/Base Reflectivity");
   const [radarOpacity, setRadarOpacity] = useState(0.85);
+  const [dealiasVelocity, setDealiasVelocity] = useState(true);
   const [radarSiteSelected, setRadarSiteSelected] = useState(false)
   const [showWasmImagePopup, setShowWasmImagePopup] = useState(false);
   const [show3D, setShow3D] = useState(false);
@@ -133,6 +134,7 @@ export default function App() {
   const handleRadarSiteSelect = useCallback((site) => {
     setSelectedRadarSite(site);
     setRadarSiteSelected(true);
+    setRadarLoadError("");
     setHistoricalSelection((selection) => ({ ...selection, day: "", time: "" }));
     if (selectedDataTime === "Latest") requestRadarLoad({ mode: "latest", icao: site.icao });
   }, [requestRadarLoad, selectedDataTime]);
@@ -154,6 +156,23 @@ export default function App() {
     setRadarLoadStatus(status);
     setRadarLoadError(error);
   }, []);
+
+  const handleDealiasVelocityChange = useCallback(async (enabled) => {
+    setDealiasVelocity(enabled);
+    try {
+      const module = await ensureWasmLoaded();
+      setWasmDealiasVelocity(module, enabled);
+    } catch (error) {
+      console.error("Failed to set dealias velocity flag:", error);
+      setDealiasVelocity(!enabled);
+      return;
+    }
+    // Dealiasing only runs during _parse_nexrad, so re-issue the current
+    // radar load for the change to take effect.
+    if (radarLoadRequest) {
+      requestRadarLoad(radarLoadRequest);
+    }
+  }, [ensureWasmLoaded, radarLoadRequest, requestRadarLoad]);
 
   useEffect(() => {
     const phoneAspectRatio = window.matchMedia("(max-aspect-ratio: 4 / 5)");
@@ -252,7 +271,7 @@ export default function App() {
           <ShaderPlane />
         </div> */}
         <div className="overlay-panel">
-          <SelectionsPanel selectedMoment={selectedMoment} setSelectedMoment={setSelectedMoment} selectedDataTime={selectedDataTime} setSelectedDataTime={handleDataTimeChange} selectedRadarSite={selectedRadarSite} historicalSelection={historicalSelection} setHistoricalSelection={setHistoricalSelection} onHistoricalLoad={handleHistoricalLoad} radarLoadStatus={radarLoadStatus} radarLoadError={radarLoadError} selectedTiltIndex={selectedTiltIndex} setSelectedTiltIndex={setSelectedTiltIndex} radarSiteSelected={radarSiteSelected} setRadarSiteSelected={setRadarSiteSelected} tiltAngles={tiltAngles} selectedColorMap={selectedColorMap} setSelectedColorMap={setSelectedColorMap} radarOpacity={radarOpacity} setRadarOpacity={setRadarOpacity} tiltInfo={tiltInfo} onOpenWasmImage={() => setShowWasmImagePopup(true)} />
+          <SelectionsPanel selectedMoment={selectedMoment} setSelectedMoment={setSelectedMoment} selectedDataTime={selectedDataTime} setSelectedDataTime={handleDataTimeChange} selectedRadarSite={selectedRadarSite} historicalSelection={historicalSelection} setHistoricalSelection={setHistoricalSelection} onHistoricalLoad={handleHistoricalLoad} radarLoadStatus={radarLoadStatus} radarLoadError={radarLoadError} selectedTiltIndex={selectedTiltIndex} setSelectedTiltIndex={setSelectedTiltIndex} radarSiteSelected={radarSiteSelected} setRadarSiteSelected={setRadarSiteSelected} tiltAngles={tiltAngles} selectedColorMap={selectedColorMap} setSelectedColorMap={setSelectedColorMap} radarOpacity={radarOpacity} setRadarOpacity={setRadarOpacity} tiltInfo={tiltInfo} dealiasVelocity={dealiasVelocity} onDealiasVelocityChange={handleDealiasVelocityChange} onOpenWasmImage={() => setShowWasmImagePopup(true)} />
           {!show3D && <ThreeDButton onOpen={() => setShow3D(true)} />}
         </div>
         {showWasmImagePopup && (
@@ -311,5 +330,18 @@ export default function App() {
       )}
     </div>
     {isLoading && <GlobalLoadingIndicator label={loadingLabel} />}
+    {radarLoadStatus === "error" && radarLoadError && (
+      <div className="radar-error-toast" role="alert">
+        <span>{radarLoadError}</span>
+        <button
+          type="button"
+          className="radar-error-toast__dismiss"
+          aria-label="Dismiss error"
+          onClick={() => handleRadarLoadState("idle")}
+        >
+          ×
+        </button>
+      </div>
+    )}
   </div>;
 }

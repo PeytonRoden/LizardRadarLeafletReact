@@ -1,5 +1,5 @@
-import { Marker, Popup } from "react-leaflet";
-import { useEffect, useRef } from "react";
+import { Marker, Popup, useMap, useMapEvents } from "react-leaflet";
+import { useEffect, useRef, useState, useMemo } from "react";
 import L from "leaflet";
 import sites from "../data/nexradSites.json";
 import { fakeRadarData } from "../utils/fakeRadarData";
@@ -91,6 +91,42 @@ function radarLabelIcon(icao) {
   });
 }
 
+function clusterIcon(count) {
+  return L.divIcon({
+    className: "radar-label-icon",
+    html: `<div class="radar-cluster"><span class="radar-cluster-count">${count}</span></div>`,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+  });
+}
+
+// Grid-based spatial clustering. Returns an array of either:
+//   { type: "site", site }
+//   { type: "cluster", lat, lon, count, key }
+function gridCluster(allSites, zoom) {
+  if (zoom >= 7) {
+    return allSites.map(site => ({ type: "site", site, key: site.icao }));
+  }
+  const gridDeg = zoom >= 6 ? 3 : zoom >= 5 ? 6 : 12;
+  const cells = new Map();
+  for (const site of allSites) {
+    const cellKey = `${Math.floor(site.latitude / gridDeg)}_${Math.floor(site.longitude / gridDeg)}`;
+    if (!cells.has(cellKey)) cells.set(cellKey, []);
+    cells.get(cellKey).push(site);
+  }
+  const result = [];
+  for (const [cellKey, cellSites] of cells) {
+    if (cellSites.length === 1) {
+      result.push({ type: "site", site: cellSites[0], key: cellSites[0].icao });
+    } else {
+      const lat = cellSites.reduce((s, x) => s + x.latitude, 0) / cellSites.length;
+      const lon = cellSites.reduce((s, x) => s + x.longitude, 0) / cellSites.length;
+      result.push({ type: "cluster", lat, lon, count: cellSites.length, key: `c_${cellKey}` });
+    }
+  }
+  return result;
+}
+
 function readCString(module, pointer) {
   if (!pointer) return "";
 
@@ -124,6 +160,11 @@ async function fetchHistoricalRadar({ icao, year, month, day, time }, signal) {
 }
 
 export default function RadarSitesLayer({ onSelect, onRadarData, onPackedRadarData, onCurrentDataTiltAngle, onCurrentRadarStationLatitude, onCurrentRadarStationLongitude, onTiltAngles, onTiltInfo, onRadarLoadState, ensureWasmLoaded, selectedMoment, selectedTiltIndex, radarLoadRequest })  {
+  const map = useMap();
+  const [zoom, setZoom] = useState(() => map.getZoom());
+  useMapEvents({ zoomend(e) { setZoom(e.target.getZoom()); } });
+  const items = useMemo(() => gridCluster(sites.nexrad_sites, zoom), [zoom]);
+
   const moduleRef = useRef(null);
   const hasRadarDataRef = useRef(false);
   const handlersRef = useRef({});
@@ -249,31 +290,36 @@ export default function RadarSitesLayer({ onSelect, onRadarData, onPackedRadarDa
 
   return (
     <>
-      {sites.nexrad_sites.map(site => (
-        <Marker
-          key={site.icao}
-          position={[site.latitude, site.longitude]}
-          icon={radarLabelIcon(site.icao)}
-          eventHandlers={{
-            click: () => {
-              onSelect?.(site);
-            },
-            mouseout: (event) => {
-              event.target.closePopup();
-            },
-          }}
-        >
-          <Popup className="radar-popup">
-            <div className="popup-content">
-              <div className="icao">{site.icao}</div>
-              <div className="city">{site.city}</div>
-              <button className="popup-btn">
-                View Radar
-              </button>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
+      {items.map(item =>
+        item.type === "cluster" ? (
+          <Marker
+            key={item.key}
+            position={[item.lat, item.lon]}
+            icon={clusterIcon(item.count)}
+            eventHandlers={{
+              click: () => map.setView([item.lat, item.lon], map.getZoom() + 2),
+            }}
+          />
+        ) : (
+          <Marker
+            key={item.key}
+            position={[item.site.latitude, item.site.longitude]}
+            icon={radarLabelIcon(item.site.icao)}
+            eventHandlers={{
+              click: () => { onSelect?.(item.site); },
+              mouseout: (e) => { e.target.closePopup(); },
+            }}
+          >
+            <Popup className="radar-popup">
+              <div className="popup-content">
+                <div className="icao">{item.site.icao}</div>
+                <div className="city">{item.site.city}</div>
+                <button className="popup-btn">View Radar</button>
+              </div>
+            </Popup>
+          </Marker>
+        )
+      )}
     </>
   );
 }

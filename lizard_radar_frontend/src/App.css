@@ -44,6 +44,43 @@
   text-shadow: 0 1px 5px #000;
 }
 
+.radar-error-toast {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(480px, calc(100vw - 32px));
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 120, 120, 0.35);
+  border-radius: 10px;
+  color: #ffb4b4;
+  background: rgba(24, 12, 12, 0.92);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font: 600 0.8rem system-ui, -apple-system, Segoe UI, sans-serif;
+  transform: translateX(-50%);
+}
+
+.radar-error-toast__dismiss {
+  flex: none;
+  padding: 0 4px;
+  border: none;
+  color: inherit;
+  background: none;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.radar-error-toast__dismiss:hover {
+  opacity: 1;
+}
+
 .overlay-panel {
   position: absolute;
   inset: 0;
@@ -291,6 +328,19 @@
 
 .advanced-opacity-control input {
   width: 100%;
+  margin: 0;
+}
+
+.advanced-toggle-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.advanced-toggle-control input {
   margin: 0;
 }
 
@@ -815,20 +865,50 @@
   accent-color: #22d3ee;
 }
 
-.voxel-selection-handle {
+/* Corner resize handles — 44×44 touch target, 20×20 visible square */
+.voxel-handle-corner {
   border: 0;
   background: transparent;
+  cursor: nwse-resize;
 }
 
-.voxel-selection-handle span {
+.voxel-handle-corner span {
   display: block;
-  width: 12px;
-  height: 12px;
-  margin: 2px;
-  border: 2px solid white;
-  border-radius: 2px;
-  background: #0b1220;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7), 0 2px 7px rgba(0, 0, 0, 0.6);
+  width: 20px;
+  height: 20px;
+  margin: 12px; /* centers 20px visual inside 44px touch target */
+  border: 2.5px solid rgba(255, 255, 255, 0.88);
+  border-radius: 4px;
+  background: rgba(11, 18, 32, 0.85);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.55);
+}
+
+/* Center move handle — 44×44 touch target, 36×36 visible circle */
+.voxel-handle-center {
+  border: 0;
+  background: transparent;
+  cursor: move !important;
+}
+
+.voxel-handle-center div {
+  width: 36px;
+  height: 36px;
+  margin: 4px; /* centers 36px visual inside 44px touch target */
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.18);
+  border: 2px solid rgba(56, 189, 248, 0.72);
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(56, 189, 248, 0.88);
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.voxel-handle-center:hover div,
+.voxel-handle-center:active div {
+  background: rgba(56, 189, 248, 0.28);
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
 }
 
 .radar-legend {
@@ -1022,13 +1102,6 @@
   .wasm-image-container__actions button,
   .wasm-image-container__actions a {
     min-height: 44px;
-  }
-
-  /* Bigger invisible tap area for the voxel corner handles */
-  .voxel-selection-handle::after {
-    content: "";
-    position: absolute;
-    inset: -13px;
   }
 
   .volume-pane__header {

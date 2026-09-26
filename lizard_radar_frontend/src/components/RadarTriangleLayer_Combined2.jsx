@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { colorMaps, getColorMap, sampleColorMap } from '../utils/colorMaps';
+import { colorMaps, getColorMap } from '../utils/colorMaps';
 import { useMap } from "react-leaflet";
 import L from "leaflet";
 
@@ -174,13 +174,14 @@ in float v_value;
 
 uniform float u_minValue;
 uniform float u_maxValue;
+uniform float u_valueScale;
 
 uniform sampler2D u_colorTable;
 
 out vec4 fragColor; // Declare output
 
 void main() {
-    float t = clamp((v_value - u_minValue) / (u_maxValue - u_minValue), 0.0, 1.0);
+    float t = clamp((v_value * u_valueScale - u_minValue) / (u_maxValue - u_minValue), 0.0, 1.0);
     fragColor = texture(u_colorTable, vec2(t, 0.5));
 }
 `;
@@ -428,6 +429,7 @@ export default function RadarTriangleLayer({ data , elevation_angle, latitude_ce
       latitudeCenter: LATITUDE_CENTER,
       longitudeCenter: LONGITUDE_CENTER,
       range: { min: 0, max: 1 },
+      valueScale: 1,
       matrix: new Float32Array(16),
       elevationAngleLocation: gl.getUniformLocation(program, "u_elevationAngle"),
       latitudeCenterLocation: gl.getUniformLocation(program, "u_latitudeCenter"),
@@ -436,6 +438,7 @@ export default function RadarTriangleLayer({ data , elevation_angle, latitude_ce
       worldSizeLocation: gl.getUniformLocation(program, "u_worldSize"),
       minValueLocation: gl.getUniformLocation(program, "u_minValue"),
       maxValueLocation: gl.getUniformLocation(program, "u_maxValue"),
+      valueScaleLocation: gl.getUniformLocation(program, "u_valueScale"),
       totalBinsLocation: gl.getUniformLocation(program, "u_totalBins"),
       textureWidthLocation: gl.getUniformLocation(program, "u_textureWidth"),
       gateSizeLocation: gl.getUniformLocation(program, "u_gateSize"),
@@ -501,6 +504,7 @@ export default function RadarTriangleLayer({ data , elevation_angle, latitude_ce
       gl.uniform1f(state.worldSizeLocation, 256 * Math.pow(2, map.getZoom()));
       gl.uniform1f(state.minValueLocation, state.range.min);
       gl.uniform1f(state.maxValueLocation, state.range.max);
+      gl.uniform1f(state.valueScaleLocation, state.valueScale);
 
 
       gl.activeTexture(gl.TEXTURE0);
@@ -634,6 +638,7 @@ export default function RadarTriangleLayer({ data , elevation_angle, latitude_ce
     if (selectedColorMap) {
       state.colorTableTexture = createColorTableTexture(gl, selectedColorMap.dense);
       state.range = selectedColorMap.range;
+      state.valueScale = selectedColorMap.scale ?? 1;
     }
     state.draw();
   }, [selectedColorMap]);
