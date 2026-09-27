@@ -8,6 +8,7 @@ import RadarTriangleLayer from "./RadarTriangleLayer_Combined";
 import RadarTriangleLayer2 from "./RadarTriangleLayer_Combined2";
 import "leaflet.glify";
 import VoxelSelectionRectangle from "./3DRadarDisplay/VoxelSelectionRectangle";
+import AlertsLayer from "./AlertsLayer";
 import { colorMaps, getColorMap } from "../utils/colorMaps";
 
 function formatLegendValue(value, step) {
@@ -107,7 +108,7 @@ function MapResizeHandler() {
   return null;
 }
 
-export default function MapView({ ensureWasmLoaded, onTiltAngles, onTiltInfo, selectedMoment, selectedTiltIndex, selectedColorMap, radarOpacity, radarLoadRequest, onRadarSiteSelect, onRadarLoadState, showVoxelSelection, voxelBounds, onVoxelBoundsChange, onRadarLatitudeChange, onRadarLongitudeChange }) {
+export default function MapView({ ensureWasmLoaded, onTiltAngles, onTiltInfo, selectedMoment, selectedDataTime, selectedTiltIndex, selectedColorMap, radarOpacity, radarLoadRequest, onRadarSiteSelect, onRadarLoadState, showVoxelSelection, voxelBounds, onVoxelBoundsChange, onRadarLatitudeChange, onRadarLongitudeChange }) {
   const [, setHeatData] = useState([]);
   const [momentDataPacked, setMomentDataPacked] = useState(new Float32Array());
   const [latitudeCenter, setLatitudeCenter] = useState(39.5);
@@ -169,6 +170,7 @@ export default function MapView({ ensureWasmLoaded, onTiltAngles, onTiltInfo, se
         radar_moment={selectedMoment}
         opacity={radarOpacity}
       />
+      {selectedDataTime === "Latest" && <AlertsLayer />}
       {showVoxelSelection && (
         <VoxelSelectionRectangle bounds={voxelBounds} onChange={onVoxelBoundsChange} />
       )}

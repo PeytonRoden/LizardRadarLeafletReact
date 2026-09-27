@@ -32,12 +32,19 @@ export default defineConfig({
       "/latest": {
         target: "http://localhost:8002",
         changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/latest/, "/nexrad/latest"),
       },
       "/available": {
         target: "http://localhost:8002",
         changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/available/, "/nexrad/available"),
       },
       "/nexrad": {
+        target: "http://localhost:8002",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/nexrad/, "/nexrad/nexrad"),
+      },
+      "/alerts": {
         target: "http://localhost:8002",
         changeOrigin: true,
       },

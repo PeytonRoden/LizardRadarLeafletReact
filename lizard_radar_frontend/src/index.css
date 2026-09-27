@@ -82,6 +82,40 @@ body {
 }
 
 
+/* Alert popups */
+.alert-popup {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  max-width: 300px;
+}
+
+.alert-event {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f0f4ff;
+  margin-bottom: 2px;
+}
+
+.alert-area {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.alert-headline {
+  color: #cbd5e1;
+}
+
+.alert-expires {
+  font-size: 0.76rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+
 /* Base container */
 .radar-label-icon {
   background: none;

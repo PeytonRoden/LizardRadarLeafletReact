@@ -574,8 +574,28 @@ float * interpolate_radar_data_to_voxels_new(float latitude_topleft, float longi
         // determine bounds
         lower_bound_azimuth_curr = std::min({bound_azimuth_curr_1, bound_azimuth_curr_2, bound_azimuth_curr_3, bound_azimuth_curr_4});
         upper_bound_azimuth_curr = std::max({bound_azimuth_curr_1, bound_azimuth_curr_2, bound_azimuth_curr_3, bound_azimuth_curr_4});
-        azimuth_bounds_wrap = upper_bound_azimuth_curr - lower_bound_azimuth_curr > 180.0f;
-        lower_bound_dist_curr = std::min({bound_dist_curr_1, bound_dist_curr_2, bound_dist_curr_3, bound_dist_curr_4});
+
+        // Determine wrap by checking whether the center of the selection box falls
+        // within [lower, upper]. If yes → no wrap (contiguous arc through the middle).
+        // If no → wrap (the data arc crosses 0°/360°).
+        // The old heuristic (max-min > 180) was wrong when the radar sits just outside
+        // a large box: the near-side corners can be nearly due east/west, causing the
+        // corner span to exceed 180° even though the data arc is entirely on one side.
+        {
+            float center_lat = (latitude_topleft + latitude_bottomright) / 2.0f;
+            float center_lon = (longitude_topleft + longitude_bottomright) / 2.0f;
+            auto bound_center = nexradLatLonToBin(radar_latitude, radar_longitude, center_lat, center_lon, tilt_angle);
+            float center_az = bound_center.azimuth_deg;
+            bool center_in_range = (center_az >= lower_bound_azimuth_curr && center_az <= upper_bound_azimuth_curr);
+            azimuth_bounds_wrap = !center_in_range;
+        }
+        // Only use corner ranges for the upper bound. The lower bound must be 0
+        // because when the radar is just outside an edge, the nearest point on
+        // the box boundary is the perpendicular foot on that edge — always closer
+        // than any corner. Using min(corner ranges) as lower_bound clips valid
+        // data near the center of the near edge. The lat/lon check below is the
+        // authoritative spatial filter.
+        lower_bound_dist_curr = 0.0f;
         upper_bound_dist_curr = std::max({bound_dist_curr_1, bound_dist_curr_2, bound_dist_curr_3, bound_dist_curr_4});
 
 

@@ -97,10 +97,30 @@ docker run --rm --detach \
   lizard-radar-api
 ```
 
+```sh
+docker run --rm \
+  --name lizard-radar-api \
+  --network lizard-radar \
+  --publish 8002:8002 \
+  lizard-radar-api
+```
+
+
 Start React and Nginx:
 
 ```sh
 docker run --rm --detach \
+  --name lizard-radar-web \
+  --network lizard-radar \
+  --env FASTAPI_HOST=lizard-radar-api \
+  --env FASTAPI_PORT=8002 \
+  --publish 8080:80 \
+  lizard-radar-web
+```
+
+
+```sh
+docker run --rm \
   --name lizard-radar-web \
   --network lizard-radar \
   --env FASTAPI_HOST=lizard-radar-api \

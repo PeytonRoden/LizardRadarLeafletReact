@@ -1,21 +1,24 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir \
-    fastapi==0.116.1 \
-    requests==2.32.4 \
-    s3fs==2025.7.0 \
-    uvicorn==0.35.0 \
-    && addgroup --system app \
-    && adduser --system --ingroup app app
+# 2. Create a non-root group and user with a explicit UID/GID
+RUN groupadd -g 10001 appgroup && \
+    useradd -u 10001 -g appgroup -m -s /bin/bash appuser
 
-COPY --chown=app:app main.py ./main.py
 
-USER app
+#install from requirements.txt
+COPY --chown=appuser:appgroup requirements.txt ./requirements.txt
+RUN pip install --upgrade pip
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY --chown=appuser:appgroup main.py ./main.py
+COPY --chown=appuser:appgroup app ./app
+
+USER appuser
 
 EXPOSE 8002
 

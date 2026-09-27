@@ -364,7 +364,7 @@ VOL_EL_RAD parse_vol_el_rad_blocks(const uint8_t* p_vol, const uint8_t* p_el, co
     rad.noise_h = read_be_float(p_rad); p_rad+=4;
     rad.noise_v = read_be_float(p_rad); p_rad+=4;
     rad.nyquist_vel = read_be16s(p_rad); p_rad+=2;
-    std::cout << "nyquist vel: " << rad.nyquist_vel << std::endl;
+    // std::cout << "nyquist vel: " << rad.nyquist_vel << std::endl;
     std::memcpy(rad.spare, p_rad, 2); p_rad += 2;
 
     vol_el_rad.rad = rad;

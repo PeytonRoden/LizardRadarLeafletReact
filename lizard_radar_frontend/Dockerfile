@@ -26,7 +26,31 @@ RUN rm /etc/nginx/conf.d/default.conf \
         '    add_header Cross-Origin-Opener-Policy "same-origin" always;' \
         '    add_header Cross-Origin-Embedder-Policy "require-corp" always;' \
         '' \
-        '    location ~ ^/(latest|available_|nexrad) {' \
+        '    location ~ ^/latest {' \
+        '        rewrite ^/latest(.*) /nexrad/latest$1 break;' \
+        '        proxy_pass http://${FASTAPI_HOST}:${FASTAPI_PORT};' \
+        '        proxy_http_version 1.1;' \
+        '        proxy_buffering off;' \
+        '        proxy_read_timeout 75s;' \
+        '    }' \
+        '' \
+        '    location ~ ^/available_ {' \
+        '        rewrite ^/available_(.*) /nexrad/available_$1 break;' \
+        '        proxy_pass http://${FASTAPI_HOST}:${FASTAPI_PORT};' \
+        '        proxy_http_version 1.1;' \
+        '        proxy_buffering off;' \
+        '        proxy_read_timeout 75s;' \
+        '    }' \
+        '' \
+        '    location ~ ^/nexrad {' \
+        '        rewrite ^/nexrad(.*) /nexrad/nexrad$1 break;' \
+        '        proxy_pass http://${FASTAPI_HOST}:${FASTAPI_PORT};' \
+        '        proxy_http_version 1.1;' \
+        '        proxy_buffering off;' \
+        '        proxy_read_timeout 75s;' \
+        '    }' \
+        '' \
+        '    location ~ ^/alerts {' \
         '        proxy_pass http://${FASTAPI_HOST}:${FASTAPI_PORT};' \
         '        proxy_http_version 1.1;' \
         '        proxy_buffering off;' \

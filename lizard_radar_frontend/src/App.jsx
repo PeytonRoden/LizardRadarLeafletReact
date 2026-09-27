@@ -250,6 +250,7 @@ export default function App() {
         <MapView
           ensureWasmLoaded={ensureWasmLoaded}
           selectedMoment={selectedMoment}
+          selectedDataTime={selectedDataTime}
           selectedTiltIndex={selectedTiltIndex}
           selectedColorMap={selectedColorMap}
           radarOpacity={radarOpacity}
